@@ -1,0 +1,299 @@
+/* frontend/src/components/Home.css */
+/* Styles specifically for the Home component, including Hero and Featured Properties sections */
+
+/* Uses CSS Variables defined in a global file like src/App.css or src/index.css */
+/* Make sure that global file is imported in your App or Index component */
+
+/* === Hero Section Refined === */
+.hero-section {
+  position: relative; /* Needed for absolute positioning if using overlays */
+  height: 75vh; /* Adjust viewport height percentage */
+  min-height: 500px; /* Minimum pixel height */
+  /* Background image with a semi-transparent dark gradient overlay for text readability */
+  background-image: linear-gradient(rgba(40, 40, 60, 0.5), rgba(40, 40, 60, 0.5)), url('https://images.pexels.com/photos/106399/pexels-photo-106399.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=2'); /* High-quality placeholder */
+  background-size: cover; /* Cover the entire area */
+  background-position: center center; /* Center the image */
+  display: flex; /* Use flexbox for centering content */
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  color: white; /* Default text color for hero */
+  padding: 20px;
+  overflow: hidden; /* Prevent content bleeding */
+}
+
+.hero-content {
+  position: relative; /* Ensure content is above pseudo-elements if used */
+  z-index: 2;
+  max-width: 900px;
+  /* Apply fade-in animation */
+  animation: fadeIn HeroContentAnimation 1.2s ease-out forwards;
+}
+
+/* Keyframe animation for hero content */
+@keyframes HeroContentAnimation {
+  from { opacity: 0; transform: translateY(30px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.hero-section h1 {
+  font-size: 3.8rem; /* Large heading */
+  margin-bottom: 1rem;
+  font-weight: 700;
+  text-shadow: 2px 2px 6px rgba(0, 0, 0, 0.6); /* Enhanced text shadow */
+  letter-spacing: -1px;
+  color: #ffffff; /* Explicitly white */
+}
+
+.hero-section p {
+  font-size: 1.4rem;
+  margin-bottom: 2.5rem;
+  font-weight: 300; /* Lighter font weight for subtitle */
+  text-shadow: 1px 1px 4px rgba(0, 0, 0, 0.6);
+  max-width: 650px;
+  line-height: 1.7;
+  color: #f0f0f0; /* Slightly off-white for better readability than pure white sometimes */
+}
+
+.hero-search-button {
+  padding: 15px 35px;
+  font-size: 1.1rem;
+  background-color: var(--primary-color); /* Use theme variable */
+  color: white;
+  border: none;
+  border-radius: 30px; /* Pill shape */
+  cursor: pointer;
+  transition: background-color var(--transition-speed) ease, transform 0.2s ease;
+  font-weight: 500;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+}
+.hero-search-button:hover {
+  background-color: var(--primary-hover-color); /* Use theme variable */
+  transform: translateY(-2px) scale(1.02);
+}
+
+/* === Featured Properties Section Refined === */
+.featured-properties {
+  padding: 80px 20px;
+  max-width: 1300px;
+  margin: 0 auto; /* Center section */
+  text-align: center;
+  background-color: var(--bg-content); /* White background */
+  border-bottom: 1px solid var(--border-color); /* Separator line */
+}
+
+.featured-properties h2 {
+  font-size: 2.5rem;
+  margin-bottom: 50px;
+  font-weight: 600;
+  color: var(--text-dark);
+  position: relative;
+  display: inline-block; /* Allows ::after to be positioned relative to text width */
+}
+/* Underline accent for heading */
+.featured-properties h2::after {
+    content: '';
+    position: absolute;
+    bottom: -10px; /* Position below the text */
+    left: 50%;
+    transform: translateX(-50%);
+    width: 70px; /* Width of underline */
+    height: 4px; /* Thickness of underline */
+    background-color: var(--primary-color); /* Use theme primary color */
+    border-radius: 2px; /* Slightly rounded ends */
+}
+
+.property-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); /* Responsive grid */
+  gap: 40px;
+  text-align: left; /* Align text within cards to the left */
+}
+
+/* === Property Card Refined === */
+/* NOTE: Card styles are defined here, ensure PropertyCard.js uses these classes */
+.property-card {
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  overflow: hidden;
+  background-color: var(--bg-content);
+  box-shadow: var(--shadow-color);
+  transition: transform var(--transition-speed) ease-in-out, box-shadow var(--transition-speed) ease-in-out;
+  display: flex;
+  flex-direction: column; /* Stack image and content vertically */
+}
+.property-card:hover {
+  transform: translateY(-8px);
+  box-shadow: var(--shadow-hover-color);
+}
+
+.property-card-image-link { display: block; position: relative; overflow: hidden; }
+.property-card-image {
+  width: 100%;
+  height: 240px;
+  object-fit: cover; /* Cover the area, cropping if necessary */
+  display: block;
+  transition: transform 0.5s ease;
+}
+.property-card:hover .property-card-image { transform: scale(1.08); }
+
+/* Optional Image Overlay on hover */
+.property-card-image-link::after {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: linear-gradient(to bottom, rgba(0,0,0,0) 60%, rgba(0,0,0,0.4) 100%); /* Gradient from bottom */
+    opacity: 0;
+    transition: opacity var(--transition-speed) ease;
+    pointer-events: none; /* Allow clicking through overlay */
+}
+.property-card:hover .property-card-image-link::after { opacity: 1; }
+
+.property-card-content { padding: 20px; flex-grow: 1; display: flex; flex-direction: column; }
+.property-card h3 {
+  font-size: 1.3rem;
+  margin-top: 0;
+  margin-bottom: 5px;
+  color: var(--text-dark);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis; /* Add '...' for long text */
+  font-weight: 600;
+}
+.property-card .location { font-size: 0.95rem; color: var(--text-muted); margin-bottom: 12px; }
+.property-card .price {
+  font-weight: 700;
+  color: var(--primary-hover-color);
+  font-size: 1.4rem;
+  margin-bottom: 12px;
+}
+.property-card .price span { font-size: 0.8em; font-weight: 400; color: var(--text-light); }
+.property-card .stats {
+    font-size: 0.9rem;
+    color: var(--text-light);
+    margin-bottom: 15px;
+    border-top: 1px solid var(--border-color); /* Use theme border color */
+    padding-top: 12px;
+    display: flex;
+    gap: 15px;
+}
+.property-card .stats span { margin-right: 0; }
+
+.property-card-link {
+  display: inline-block;
+  margin-top: auto; /* Push link to the bottom */
+  padding: 9px 18px;
+  color: var(--primary-color);
+  text-decoration: none;
+  font-weight: 500;
+  border: 1px solid var(--primary-color);
+  border-radius: 4px;
+  text-align: center;
+  transition: background-color var(--transition-speed) ease, color var(--transition-speed) ease;
+}
+.property-card-link:hover { background-color: var(--primary-color); color: white; text-decoration: none; }
+
+/* === Contact Us Section === */
+.contact-section {
+  padding: 80px 20px; /* Match featured properties padding */
+  background-color: var(--bg-main); /* Use main background */
+  border-top: 1px solid var(--border-color);
+  text-align: center;
+}
+
+.contact-section h2 {
+  font-size: 2.5rem;
+  margin-bottom: 25px;
+  font-weight: 600;
+  color: var(--text-dark);
+}
+.contact-section h2::after { /* Optional underline */
+    content: ''; display: block; width: 70px; height: 4px; background: var(--primary-color); margin: 10px auto 0 auto; border-radius: 2px;
+}
+
+
+.contact-section p.section-subtitle { /* Add a class for subtitle below H2 */
+  font-size: 1.1rem;
+  color: var(--text-light);
+  max-width: 650px;
+  margin: 0 auto 40px auto; /* Center paragraph */
+}
+
+.contact-form {
+  max-width: 700px;
+  margin: 0 auto 50px auto; /* Add space below form */
+  text-align: left;
+  /* Uses styles from Form.css via applied classes */
+}
+
+.contact-info {
+    margin-top: 40px;
+    padding-top: 40px;
+    border-top: 1px solid var(--border-color);
+    display: flex;
+    justify-content: space-around;
+    flex-wrap: wrap;
+    gap: 30px; /* More gap */
+}
+
+.contact-info-item {
+    text-align: center;
+    min-width: 220px;
+}
+
+.contact-info-item h4 {
+    font-size: 1.3rem; /* Slightly larger */
+    color: var(--text-dark);
+    margin-bottom: 15px; /* More space */
+}
+
+.contact-info-item p {
+    font-size: 1rem;
+    color: var(--text-light);
+    margin-bottom: 5px;
+    line-height: 1.6; /* Ensure good line spacing */
+}
+.contact-info-item a { color: var(--primary-color); }
+.contact-info-item a:hover { color: var(--primary-hover-color); }
+
+/* === Loading/Error States === */
+.loading, .error {
+    grid-column: 1 / -1; /* Ensure it spans grid if inside one */
+    text-align: center;
+    padding: 40px 20px;
+    font-size: 1.1em;
+    color: var(--text-light);
+}
+.error {
+    color: var(--error-text);
+    background-color: var(--error-bg);
+    border: 1px solid var(--error-border);
+    border-radius: 5px;
+    display: inline-block;
+    min-width: 300px;
+}
+
+/* === Responsive Adjustments === */
+@media (max-width: 992px) {
+    .property-grid { grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 30px; }
+}
+@media (max-width: 768px) {
+    .hero-section { height: 65vh; min-height: 400px;}
+    .hero-section h1 { font-size: 2.8rem; }
+    .hero-section p { font-size: 1.1rem; }
+    .property-grid { grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 25px; }
+    .featured-properties, .contact-section { padding: 60px 15px; }
+    .featured-properties h2, .contact-section h2 { font-size: 2rem; margin-bottom: 30px; }
+    .contact-info { flex-direction: column; align-items: center; gap: 25px; }
+}
+@media (max-width: 480px) {
+    .hero-section { height: 60vh; min-height: 350px;}
+    .hero-section h1 { font-size: 2.2rem; }
+    .hero-section p { font-size: 1rem; }
+    .property-grid { grid-template-columns: 1fr; gap: 20px; }
+    .featured-properties, .contact-section { padding: 40px 10px; }
+    .featured-properties h2, .contact-section h2 { font-size: 1.8rem; margin-bottom: 25px; }
+    .property-card-content { padding: 15px; }
+    .contact-info-item { min-width: unset; width: 90%; }
+}

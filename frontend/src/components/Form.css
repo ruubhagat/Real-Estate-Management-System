@@ -1,0 +1,102 @@
+/* frontend/src/components/Form.css */
+
+/* Uses variables defined in global App.css/index.css */
+
+.form-container {
+  max-width: 600px;
+  margin: 2rem auto;
+  padding: 35px; /* More padding */
+  background: var(--bg-content);
+  border-radius: 6px;
+  box-shadow: var(--shadow-color);
+  border: 1px solid var(--border-color);
+}
+
+.form-container h2 {
+  text-align: center;
+  margin-top: 0;
+  margin-bottom: 30px;
+  color: var(--text-dark);
+  font-weight: 600;
+}
+
+.form-input-group {
+  margin-bottom: 22px; /* Increase spacing */
+}
+
+.form-input-group label {
+  display: block;
+  margin-bottom: 8px;
+  font-weight: 500;
+  color: var(--text-light);
+  font-size: 0.95rem;
+}
+
+.form-input-group input[type="text"],
+.form-input-group input[type="email"],
+.form-input-group input[type="password"],
+.form-input-group input[type="number"],
+.form-input-group input[type="date"],
+.form-input-group input[type="time"],
+.form-input-group select,
+.form-input-group textarea {
+    width: 100%;
+    padding: 12px 15px;
+    box-sizing: border-box;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    font-size: 1rem;
+    color: var(--text-dark);
+    background-color: #fff;
+    transition: border-color var(--transition-speed) ease, box-shadow var(--transition-speed) ease;
+}
+
+.form-input-group textarea { resize: vertical; min-height: 90px; }
+
+.form-input-group input:focus,
+.form-input-group select:focus,
+.form-input-group textarea:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 3px rgba(10, 147, 150, 0.25); /* Use primary color for glow */
+}
+
+.form-button {
+   display: inline-block;
+   width: 100%;
+   padding: 14px 20px; /* Larger button */
+   font-size: 1.1rem;
+   background-color: var(--primary-color);
+   color: white;
+   border: none;
+   border-radius: 5px;
+   cursor: pointer;
+   transition: background-color var(--transition-speed) ease, transform 0.1s ease;
+   font-weight: 500;
+   text-align: center;
+   margin-top: 10px;
+}
+.form-button:hover:not(:disabled) { background-color: var(--primary-hover-color); transform: translateY(-1px); }
+.form-button:disabled { background-color: #adb5bd; cursor: not-allowed; opacity: 0.7; }
+
+.form-message { padding: 12px 15px; border-radius: 4px; margin-bottom: 20px; font-size: 0.95em; border-width: 1px; border-style: solid; }
+.form-error { color: var(--error-text); background-color: var(--error-bg); border-color: var(--error-border); }
+.form-success { color: var(--success-text); background-color: var(--success-bg); border-color: var(--success-border); }
+
+.form-row { display: flex; gap: 15px; margin-bottom: 20px; }
+.form-col { flex: 1; }
+.form-col-2 { flex: 2; }
+.form-col-1 { flex: 1; }
+
+/* Style for cancel buttons (optional) */
+.form-button-cancel {
+    background-color: var(--secondary-color);
+    color: var(--text-dark);
+    margin-top: 10px;
+    padding: 10px 15px;
+    width: auto; /* Don't force full width */
+}
+.form-button-cancel:hover:not(:disabled) {
+     background-color: var(--secondary-hover-color);
+     color: var(--text-dark);
+}

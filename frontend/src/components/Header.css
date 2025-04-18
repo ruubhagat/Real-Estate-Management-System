@@ -1,0 +1,87 @@
+/* frontend/src/components/Header.css */
+
+.app-header {
+  background-color: var(--bg-content);
+  padding: 0 2rem; /* Padding left/right only */
+  border-bottom: 1px solid var(--border-color);
+  box-shadow: 0 2px 5px var(--shadow-color);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+  height: 70px; /* Slightly taller header */
+  box-sizing: border-box;
+}
+
+.header-logo a {
+  font-size: 1.8rem; /* Larger logo text */
+  font-weight: 700;
+  color: var(--primary-hover-color); /* Darker teal for logo */
+  text-decoration: none;
+  letter-spacing: -1px; /* Tighten spacing */
+}
+.header-logo a:hover {
+    color: var(--primary-color);
+}
+
+.header-nav-links,
+.header-user-actions {
+    display: flex;
+    align-items: center;
+    height: 100%; /* Align items vertically */
+}
+
+.header-nav-links a,
+.header-user-actions a {
+  color: var(--text-light);
+  text-decoration: none;
+  margin: 0 1.2rem; /* More spacing */
+  font-weight: 500;
+  padding: 0.5rem 0; /* Vertical padding for larger click area */
+  position: relative;
+  height: 100%; /* Make link area fill header height */
+  display: flex;
+  align-items: center;
+  border-bottom: 3px solid transparent; /* Placeholder for hover effect */
+  transition: color var(--transition-speed) ease, border-color var(--transition-speed) ease;
+}
+
+.header-nav-links a:hover,
+.header-user-actions a:hover {
+  color: var(--primary-hover-color);
+  border-bottom-color: var(--primary-color); /* Underline effect on hover */
+}
+
+.header-user-info {
+  margin-right: 1.5rem; /* More space */
+  font-size: 0.9em;
+  color: var(--text-muted);
+}
+
+.header-logout-button {
+  padding: 8px 15px; /* Slightly larger button */
+  font-size: 0.9rem;
+  cursor: pointer;
+  background-color: transparent; /* Transparent background */
+  border: 1px solid var(--primary-color); /* Primary color border */
+  border-radius: 4px;
+  color: var(--primary-color); /* Primary color text */
+  transition: background-color var(--transition-speed) ease, color var(--transition-speed) ease;
+}
+
+.header-logout-button:hover {
+  background-color: var(--primary-color);
+  color: white;
+}
+
+/* Responsive adjustments if needed */
+@media (max-width: 992px) {
+    .header-nav-links a, .header-user-actions a { margin: 0 0.8rem; }
+    .app-header { padding: 0 1rem; }
+}
+@media (max-width: 768px) {
+    .header-nav-links { display: none; } /* Example: Hide nav links, implement burger menu */
+    .app-header { justify-content: space-between; } /* Adjust spacing */
+}
