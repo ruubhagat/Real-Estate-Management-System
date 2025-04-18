@@ -1,19 +1,32 @@
 import React, { useState } from 'react';
 import apiClient from '../api/axiosConfig';
-import './Form.css';
+import './Form.css'; // Ensure form styles are available
 
-// Simple date/time validation helper (basic examples)
+// Simple date validation helper (basic example)
 const validateDate = (dateStr) => {
     if (!dateStr) return false;
     const today = new Date();
     today.setHours(0, 0, 0, 0); // Set time to start of day for comparison
-    const selectedDate = new Date(dateStr + 'T00:00:00'); // Ensure parsing as local date
-    return selectedDate >= today;
+    try {
+      // Ensure date string is parsed correctly, considering potential timezone issues
+      // Parsing as YYYY-MM-DD assumes local timezone
+      const selectedDate = new Date(dateStr + 'T00:00:00');
+      if (isNaN(selectedDate.getTime())) return false; // Invalid date format
+      return selectedDate >= today;
+    } catch (e) {
+      return false; // Error during date parsing
+    }
 };
 
+// VVV --- MODIFIED TIME VALIDATION --- VVV
 const validateTime = (timeStr) => {
-    return /^(0[8-9]|1[0-7]):[0-5]\d$/.test(timeStr); // Example: Allow 08:00 to 17:59
+    // Check format HH:mm and range 11:00 to 18:59 (for up to 7 PM)
+    if (!/^(0[0-9]|1[0-9]|2[0-3]):[0-5]\d$/.test(timeStr)) return false; // Basic HH:mm format check
+    const [hours, minutes] = timeStr.split(':').map(Number);
+    // Check if time is between 11:00 AM and 6:59 PM (inclusive of 11:00, exclusive of 19:00)
+    return hours >= 11 && hours < 19; // 11 AM to just before 7 PM
 };
+// ^^^ --- END MODIFIED TIME VALIDATION --- ^^^
 
 
 function RequestBookingForm({ propertyId, onBookingSuccess, onCancel }) {
@@ -36,46 +49,62 @@ function RequestBookingForm({ propertyId, onBookingSuccess, onCancel }) {
             setError('Visit date must be today or a future date.');
             return;
         }
+         // Use updated validation function
          if (!validateTime(visitTime)) {
-            setError('Please select a valid time between 08:00 and 17:59.');
+             // Update error message for new time range
+            setError('Please select a valid visit time between 11:00 AM and 6:59 PM.');
             return;
         }
-
 
         setSubmitting(true);
         try {
             const bookingRequest = {
-                propertyId: propertyId,
+                propertyId: propertyId, // Passed as prop
                 visitDate: visitDate,
                 visitTime: visitTime, // Send as HH:mm string
                 customerNotes: customerNotes,
             };
             console.log("Submitting booking request:", bookingRequest);
-            await apiClient.post('/bookings', bookingRequest); // POST /api/bookings
+            // Use the correct endpoint (relative to apiClient baseURL)
+            await apiClient.post('/bookings', bookingRequest);
 
             onBookingSuccess(); // Notify parent component
-            // Reset form? Parent component hides it now.
+            // Clear form after successful submission (optional, as parent hides it)
             setVisitDate('');
             setVisitTime('');
             setCustomerNotes('');
 
         } catch (err) {
             console.error("Failed to submit booking request:", err);
-            const errMsg = err.response?.data?.error || err.message || 'Failed to submit request.';
+            let errMsg = 'Failed to submit request.';
+            if(err.response?.data?.error) {
+                errMsg = err.response.data.error;
+            } else if (err.response?.status === 400) { // Catch potential backend validation errors
+                 errMsg = err.response.data?.message || "Invalid booking data provided.";
+            } else if (err.response?.status === 401 || err.response?.status === 403) {
+                 errMsg = "Authentication error. Please log in again.";
+            } else {
+                 errMsg = err.message || errMsg;
+            }
             setError(errMsg);
         } finally {
             setSubmitting(false);
         }
     };
 
-    // --- Styles ---
-    const formStyle = { border: '1px dashed #ccc', padding: '15px', marginTop: '10px', borderRadius: '5px' };
-    const inputGroupStyle = { marginBottom: '10px' };
-    const labelStyle = { display: 'block', marginBottom: '3px', fontSize: '0.9em' };
-    const inputStyle = { width: '95%', padding: '8px', boxSizing: 'border-box', marginBottom: '5px', border: '1px solid #ccc', borderRadius: '4px'};
-    const buttonStyle = { padding: '8px 15px', cursor: 'pointer', marginRight: '10px', border: 'none', borderRadius: '4px'};
-    const errorStyle = { color: 'red', fontSize: '0.9em', marginTop: '5px'};
-
+    // --- Styles --- (Keep or move to CSS)
+    const formStyle = { border: '1px dashed #ccc', padding: '15px', marginTop: '10px', borderRadius: '5px', backgroundColor: '#fdfdfd' };
+    const inputGroupStyle = { marginBottom: '15px' }; // Increased spacing
+    const labelStyle = { display: 'block', marginBottom: '5px', fontSize: '0.9em', fontWeight: '500' };
+    const inputStyle = { width: '100%', padding: '10px', boxSizing: 'border-box', border: '1px solid #ccc', borderRadius: '4px', fontSize:'1rem'}; // Consistent input size
+    const textareaStyle = { ...inputStyle, resize: 'vertical', minHeight: '70px' };
+    const buttonContainerStyle = { display: 'flex', gap: '10px', marginTop: '10px'};
+    const buttonStyle = { padding: '10px 15px', cursor: 'pointer', border: 'none', borderRadius: '4px', fontWeight: '500'};
+    const submitButtonStyle = {...buttonStyle, backgroundColor: 'var(--primary-color)', color: 'white'};
+    const cancelButtonStyle = {...buttonStyle, backgroundColor: 'var(--secondary-color)', color: 'var(--text-dark)'};
+    const disabledButtonStyle = {...submitButtonStyle, opacity: 0.6, cursor: 'not-allowed'};
+    const errorStyle = { color: 'var(--error-text)', fontSize: '0.9em', marginTop: '10px', marginBottom:'10px', fontWeight:'500'};
+    const helperTextStyle = { fontSize: '0.85em', color: 'var(--text-muted)', display: 'block', marginTop: '4px'};
 
     return (
         <form onSubmit={handleSubmit} style={formStyle}>
@@ -89,6 +118,8 @@ function RequestBookingForm({ propertyId, onBookingSuccess, onCancel }) {
                     onChange={(e) => setVisitDate(e.target.value)}
                     style={inputStyle}
                     required
+                    // Consider adding a min attribute for better browser UX
+                    // min={new Date().toISOString().split('T')[0]}
                 />
             </div>
              <div style={inputGroupStyle}>
@@ -100,10 +131,12 @@ function RequestBookingForm({ propertyId, onBookingSuccess, onCancel }) {
                     onChange={(e) => setVisitTime(e.target.value)}
                     style={inputStyle}
                     required
-                    // Optional: Add min/max if browser supports it well
-                    // min="08:00" max="17:00"
+                    // Optional: HTML5 min/max might provide basic browser-level constraints
+                    // min="11:00" max="18:59" // Note: max is often exclusive in time inputs
                  />
-                  <small> (Available 08:00 - 17:59)</small>
+                  {/* VVV --- MODIFIED HELPER TEXT --- VVV */}
+                  <small style={helperTextStyle}> (Visit hours: 11:00 AM - 7:00 PM)</small>
+                  {/* ^^^ --- END MODIFIED HELPER TEXT --- ^^^ */}
             </div>
             <div style={inputGroupStyle}>
                 <label htmlFor="customerNotes" style={labelStyle}>Notes (Optional):</label>
@@ -112,15 +145,15 @@ function RequestBookingForm({ propertyId, onBookingSuccess, onCancel }) {
                     value={customerNotes}
                     onChange={(e) => setCustomerNotes(e.target.value)}
                     rows="3"
-                    style={inputStyle}
+                    style={textareaStyle} // Use specific style for textarea
                     placeholder="Any specific questions or requests?"
                 ></textarea>
             </div>
-            <div>
-                <button type="submit" disabled={submitting} style={{...buttonStyle, backgroundColor: '#007bff', color: 'white'}}>
+            <div style={buttonContainerStyle}>
+                <button type="submit" disabled={submitting} style={submitting ? disabledButtonStyle : submitButtonStyle}>
                     {submitting ? 'Submitting...' : 'Submit Request'}
                 </button>
-                 <button type="button" onClick={onCancel} style={{...buttonStyle, backgroundColor: '#6c757d', color: 'white'}}>
+                 <button type="button" onClick={onCancel} style={cancelButtonStyle} disabled={submitting}>
                     Cancel
                 </button>
             </div>

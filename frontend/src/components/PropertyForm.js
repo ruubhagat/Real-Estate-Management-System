@@ -8,7 +8,8 @@ function PropertyForm() {
   const [formData, setFormData] = useState({
     address: '', city: '', state: '', postalCode: '', price: '',
     bedrooms: '', bathrooms: '', areaSqft: '', description: '',
-    type: 'SALE',
+    type: 'SALE', // Default type
+    // Status is set by backend now
   });
   const [selectedFiles, setSelectedFiles] = useState(null);
   const [submitting, setSubmitting] = useState(false);
@@ -29,27 +30,37 @@ function PropertyForm() {
   const handleSubmit = async (e) => {
     e.preventDefault(); setError(''); setSuccess(''); setSubmitting(true);
 
-    if (!formData.address || !formData.city || !formData.price || !formData.bedrooms || !formData.bathrooms) {
-        setError('Please fill in Address, City, Price, Bedrooms, Bathrooms.'); setSubmitting(false); return;
+    // Frontend validation (ensure it matches backend required fields)
+    if (!formData.address || !formData.city || !formData.state || !formData.postalCode || !formData.price || !formData.bedrooms || !formData.bathrooms || !formData.type) {
+        setError('Please fill in all required fields (Address, City, State, Postal Code, Price, Type, Bedrooms, Bathrooms).');
+        setSubmitting(false); return;
     }
 
     // --- Step 1: Create Property with Text Data ---
     const propertyPayload = { ...formData }; // Copy text data
     try {
-        const response = await apiClient.post('/properties', propertyPayload); // POST JSON data
-        const savedProperty = response.data; // Should be the saved Property entity
-        console.log("Property created:", savedProperty);
+        console.log("Creating property payload:", propertyPayload); // Log before call
 
-        // --- Step 2: If successful AND files exist, Upload Images ---
-        if (savedProperty?.id && selectedFiles?.length > 0) { // Use optional chaining
-            console.log(`Uploading ${selectedFiles.length} files for property ${savedProperty.id}...`);
-            const imageFormData = new FormData(); // Create FormData for files
+        // --- CORRECTED API CALL PATH ---
+        // Use relative path '/properties' - baseURL 'http://localhost:8081/api' will be prepended by Axios
+        console.log("Sending POST request to: /properties"); // Log the relative path
+        const response = await apiClient.post('/properties', propertyPayload);
+        // --- END CORRECTION ---
+
+        const savedProperty = response.data;
+        console.log("Property created successfully:", savedProperty);
+
+        // --- Step 2: If successful AND files exist, Upload Images via Owner Endpoint ---
+        if (savedProperty?.id && selectedFiles?.length > 0) {
+            console.log(`Uploading ${selectedFiles.length} files for property ${savedProperty.id} via owner endpoint...`);
+            const imageFormData = new FormData();
             for (let i = 0; i < selectedFiles.length; i++) {
-                imageFormData.append('files', selectedFiles[i]); // Key MUST match @RequestParam("files")
+                imageFormData.append('files', selectedFiles[i]);
             }
             try {
-                 // Make separate POST request for images as multipart/form-data
-                 await apiClient.post(`/properties/${savedProperty.id}/images`, imageFormData, {
+                 // Use the owner endpoint (relative path)
+                 console.log(`Sending POST request for images to: /owner/properties/${savedProperty.id}/images`);
+                 await apiClient.post(`/owner/properties/${savedProperty.id}/images`, imageFormData, {
                      headers: { 'Content-Type': 'multipart/form-data' },
                  });
                  console.log("Images uploaded successfully.");
@@ -58,13 +69,21 @@ function PropertyForm() {
 
             } catch (uploadError) {
                  console.error("Image upload failed after property creation:", uploadError);
-                 setError(`Property created (ID: ${savedProperty.id}), but image upload failed: ${uploadError.response?.data?.error || uploadError.message}. You can add images later by editing.`);
-                 // Don't redirect if image upload fails, keep submitting=false
-                 setSubmitting(false);
-                 return;
+                 let uploadErrMsg = "Image upload failed.";
+                 if (uploadError.response?.status === 403) {
+                     uploadErrMsg = "Permission denied for image upload. Please check login status.";
+                 } else if (uploadError.response?.data?.error) {
+                     uploadErrMsg = uploadError.response.data.error;
+                 } else {
+                     uploadErrMsg = uploadError.message;
+                 }
+                 // Crucially, inform the user the property was created but images failed
+                 setError(`Property created (ID: ${savedProperty.id}), but image upload failed: ${uploadErrMsg}. You can add images later by editing.`);
+                 setSubmitting(false); // Allow user to retry or navigate away
+                 return; // Stop execution here
             }
         } else {
-             // Property created, no images to upload
+             // Property created, no images were selected to upload
              setSuccess(`Property created successfully! Redirecting...`);
              setTimeout(() => navigate('/properties'), 1500);
         }
@@ -72,11 +91,28 @@ function PropertyForm() {
 
     } catch (err) { // Catch errors from the initial property creation POST
       console.error(`Failed to create property:`, err);
-      const errMsg = err.response?.data?.error || err.message || `Failed to create property.`;
-      setError(errMsg);
-      setSubmitting(false); // Set submitting false on error
+      // --- Log Detailed Error ---
+      if (err.response) {
+          console.error("[PropertyForm] Create Error Response Status:", err.response.status);
+          console.error("[PropertyForm] Create Error Response Data:", err.response.data);
+      } else if (err.request) {
+          console.error("[PropertyForm] Create Error Request (No response received):", err.request);
+      } else {
+          console.error("[PropertyForm] Create Error Message (Setup or other issue):", err.message);
+      }
+      // --- End Detailed Error Log ---
+      let createErrMsg = 'Failed to create property.';
+       if (err.response?.status === 401 || err.response?.status === 403) {
+            createErrMsg = "Authentication failed, session expired, or insufficient permissions to create property.";
+       } else if (err.response?.data?.error) {
+            createErrMsg = err.response.data.error;
+       } else {
+            createErrMsg = err.message; // Use the generic Axios error message if no specific details
+       }
+      setError(createErrMsg);
+      setSubmitting(false); // Set submitting false on creation error
     }
-  };
+  }; // End of handleSubmit
 
 
   return (
@@ -90,8 +126,8 @@ function PropertyForm() {
          <div className="form-input-group"><label htmlFor="address">Address:</label><input type="text" id="address" name="address" value={formData.address} onChange={handleInputChange} required /></div>
          <div className="form-row">
             <div className="form-input-group form-col-2"><label htmlFor="city">City:</label><input type="text" id="city" name="city" value={formData.city} onChange={handleInputChange} required /></div>
-            <div className="form-input-group form-col-1"><label htmlFor="state">State:</label><input type="text" id="state" name="state" value={formData.state} onChange={handleInputChange} /></div>
-            <div className="form-input-group form-col-1"><label htmlFor="postalCode">Postal Code:</label><input type="text" id="postalCode" name="postalCode" value={formData.postalCode} onChange={handleInputChange} /></div>
+            <div className="form-input-group form-col-1"><label htmlFor="state">State:</label><input type="text" id="state" name="state" value={formData.state} onChange={handleInputChange} required /></div>
+            <div className="form-input-group form-col-1"><label htmlFor="postalCode">Postal Code:</label><input type="text" id="postalCode" name="postalCode" value={formData.postalCode} onChange={handleInputChange} required /></div>
          </div>
          <div className="form-input-group"><label htmlFor="price">Price (₹):</label><input type="number" id="price" name="price" value={formData.price} onChange={handleInputChange} required step="0.01" min="0"/></div>
          <div className="form-row">
@@ -102,10 +138,10 @@ function PropertyForm() {
          <div className="form-input-group"><label htmlFor="type">Property Type:</label><select id="type" name="type" value={formData.type} onChange={handleInputChange} required><option value="SALE">For Sale</option><option value="RENT">For Rent</option></select></div>
          {/* File Input */}
          <div className="form-input-group">
-             <label htmlFor="propertyImages">Property Images:</label>
+             <label htmlFor="propertyImages">Property Images (Optional):</label>
              <input type="file" id="propertyImages" name="files" multiple onChange={handleFileChange} accept="image/png, image/jpeg, image/gif" />
-             <small className="text-muted">Select one or more images (JPG, PNG, GIF).</small>
-             {selectedFiles && <p className="text-small">{selectedFiles.length} file(s) selected.</p>}
+             <small style={{display: 'block', marginTop: '5px', color: 'var(--text-muted)'}}>Select one or more images (JPG, PNG, GIF).</small>
+             {selectedFiles && <p style={{fontSize: '0.9em', marginTop: '5px'}}>{selectedFiles.length} file(s) selected.</p>}
          </div>
          <div className="form-input-group"><label htmlFor="description">Description:</label><textarea id="description" name="description" value={formData.description} onChange={handleInputChange} rows="4"></textarea></div>
 
@@ -114,7 +150,8 @@ function PropertyForm() {
          </button>
       </form>
        <div style={{ marginTop: '20px', textAlign: 'center' }}>
-            <Link to="/properties">Cancel</Link>
+            {/* Link back to properties list */}
+            <Link to="/properties" style={{color: 'var(--primary-color)'}}>Cancel</Link>
        </div>
     </div>
   );

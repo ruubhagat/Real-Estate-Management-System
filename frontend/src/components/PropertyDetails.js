@@ -2,183 +2,232 @@ import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import apiClient from '../api/axiosConfig';
 import RequestBookingForm from './RequestBookingForm';
-// import './PropertyDetails.css'; // Optional specific styles
+// import './PropertyDetails.css'; // Consider using a CSS file for styles
 
 function PropertyDetails() {
   const [property, setProperty] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const [error, setError] = useState(''); // For fetch errors
+  const [actionError, setActionError] = useState(''); // For delete/booking errors
   const { id } = useParams();
   const navigate = useNavigate();
   const [showBookingForm, setShowBookingForm] = useState(false);
 
-  // --- Get current user info ---
-  // Ensure these are retrieved correctly after login
+  // Get current user info from local storage
   const currentUserId = localStorage.getItem('userId');
   const currentUserRole = localStorage.getItem('userRole');
 
-
+  // Fetch property details when component mounts or ID changes
   useEffect(() => {
     const fetchPropertyDetails = async () => {
-       setLoading(true); setError('');
-       if (!id) { setError("No property ID provided."); setLoading(false); return; }
-       try {
-         // API call uses apiClient, should include token
-         const response = await apiClient.get(`/properties/${id}`);
-         setProperty(response.data); // Assuming backend returns the Property entity
-       } catch (err) {
-         console.error("Failed to fetch property details:", err);
-         const errMsg = err.response?.status === 404
-                         ? "Property not found."
-                         : (err.response?.data?.error || err.message || 'Failed to load property details.');
-         setError(errMsg);
-       } finally { setLoading(false); }
+      setLoading(true);
+      setError('');
+      setActionError('');
+      if (!id) {
+        setError("No property ID provided.");
+        setLoading(false);
+        return;
+      }
+      try {
+        console.log(`[PropertyDetails] Fetching details for ID: ${id}`);
+        // Use relative path '/properties/{id}'
+        const response = await apiClient.get(`/properties/${id}`);
+        console.log("[PropertyDetails] API Response Data:", response.data);
+        setProperty(response.data);
+      } catch (err) {
+        console.error("[PropertyDetails] Failed to fetch property details:", err);
+        let errMsg = 'Failed to load property details.';
+         if (err.response?.status === 404) {
+            errMsg = "Property not found.";
+         } else if (err.response?.status === 403) {
+             errMsg = "Permission denied to view this property.";
+         } else if (err.response?.data?.error) {
+            errMsg = err.response.data.error;
+         } else {
+            errMsg = err.message;
+         }
+        setError(errMsg);
+      } finally {
+        setLoading(false);
+      }
     };
     fetchPropertyDetails();
-  }, [id]);
+  }, [id]); // Re-run effect if the id parameter changes
 
-  // Delete handler
+  // Handle property deletion
   const handleDelete = async () => {
-       if (!window.confirm(`Are you sure you want to delete property "${property?.address}"? This cannot be undone.`)) { // Added optional chaining
-          return;
-       }
-       setError('');
-       try {
-           await apiClient.delete(`/properties/${id}`); // API call uses apiClient
-           alert('Property deleted successfully!');
-           navigate('/properties');
-       } catch (err) {
-            console.error("Failed to delete property:", err);
-            const errMsg = err.response?.data?.error || err.message || 'Failed to delete property.';
-            setError(`Delete failed: ${errMsg}`);
-            alert(`Delete failed: ${errMsg}`);
-       }
+    if (!window.confirm(`Are you sure you want to delete property "${property?.address || 'N/A'}"? This action cannot be undone.`)) return;
+    setActionError(''); // Clear previous action errors
+    try {
+        console.log(`Owner: Deleting property ${id} via owner endpoint...`);
+
+        // --- CORRECTED API CALL PATH ---
+        // Use relative path '/owner/properties/{id}' - baseURL 'http://localhost:8081/api' will be prepended by Axios
+        await apiClient.delete(`/owner/properties/${id}`);
+        // --- END CORRECTION ---
+
+        alert('Property deleted successfully!');
+        navigate('/properties'); // Navigate back to the list after deletion
+    } catch (err) {
+         console.error("Owner: Failed to delete property:", err);
+         // Log detailed error information
+         if (err.response) {
+             console.error("[PropertyDetails] Delete Error Response Status:", err.response.status);
+             console.error("[PropertyDetails] Delete Error Response Data:", err.response.data);
+         } else if (err.request) {
+             console.error("[PropertyDetails] Delete Error Request (No response received):", err.request);
+         } else {
+             console.error("[PropertyDetails] Delete Error Message (Setup or other issue):", err.message);
+         }
+
+         // Set user-friendly message
+         let deleteErrMsg = 'Failed to delete property.';
+         if (err.response?.status === 403) {
+            // This message is now more likely accurate as the URL is fixed
+            deleteErrMsg = "Permission Denied: You might not be the owner of this property or your session expired.";
+         } else if (err.response?.status === 404) {
+            deleteErrMsg = "Property not found. It might have already been deleted.";
+         } else if (err.response?.data?.error) {
+            deleteErrMsg = err.response.data.error;
+         } else {
+            deleteErrMsg = err.message;
+         }
+         setActionError(`Delete failed: ${deleteErrMsg}`); // Set action error state
+         alert(`Delete failed: ${deleteErrMsg}`); // Also alert the user
+    }
+  }; // End of handleDelete
+
+  // --- Inline Styles (Consider moving to a CSS file) ---
+  const containerStyle = {
+      padding: '20px',
+      maxWidth: '1000px',
+      margin: '20px auto',
+      backgroundColor: 'var(--bg-content)',
+      borderRadius: '6px',
+      boxShadow: 'var(--shadow-color)',
+      border: '1px solid var(--border-color)',
   };
+  const mainImageStyle = {
+      display: 'block', width: '100%', maxHeight: '65vh', objectFit: 'contain',
+      marginBottom: '25px', borderRadius: '4px', backgroundColor: '#f0f0f0',
+      border: '1px solid var(--border-color)'
+  };
+   const thumbnailContainerStyle = {
+      display: 'flex', gap: '10px', flexWrap: 'wrap', marginBottom: '20px',
+      paddingTop: '10px', borderTop: '1px solid var(--border-extra-light-color)'
+   };
+   const thumbnailStyle = {
+      height: '80px', width: 'auto', objectFit: 'cover', borderRadius: '3px',
+      border: '1px solid var(--border-color)', cursor: 'pointer'
+   };
+  const detailsSectionStyle = {
+      marginBottom: '20px', paddingTop: '15px',
+      borderTop: '1px solid var(--border-extra-light-color)'
+  };
+  const detailItemStyle = { marginBottom: '8px', fontSize: '1rem', color: 'var(--text-light)' };
+  const detailLabelStyle = { fontWeight: '600', color: 'var(--text-dark)', marginRight: '8px' };
+  const buttonContainerStyle = {
+      marginTop: '25px', paddingTop: '20px', borderTop: '1px solid var(--border-color)',
+      display: 'flex', gap: '10px', flexWrap: 'wrap'
+   };
+  const buttonStyle = {
+      padding: '10px 18px', fontSize: '0.95rem', borderRadius: '4px', border: 'none', cursor: 'pointer',
+      fontWeight: '500', transition: 'background-color 0.2s ease, transform 0.1s ease',
+      textDecoration: 'none', display: 'inline-block', textAlign: 'center',
+  };
+  const editButtonStyle = { ...buttonStyle, backgroundColor: 'var(--accent-color)', color: '#fff', '&:hover': { backgroundColor: 'var(--accent-hover-color)' } };
+  const deleteButtonStyle = { ...buttonStyle, backgroundColor: 'var(--error-bg)', color: 'var(--error-text)', border: '1px solid var(--error-border)', '&:hover': { backgroundColor: 'var(--error-hover-bg)' } };
+  const bookButtonStyle = { ...buttonStyle, backgroundColor: 'var(--primary-color)', color: '#fff', '&:hover': { backgroundColor: 'var(--primary-hover-color)' } };
+  const errorBoxStyle = {
+    color: 'var(--error-text)', backgroundColor: 'var(--error-bg)', border: '1px solid var(--error-border)',
+    padding: '15px', marginBottom: '15px', borderRadius: '4px'
+  };
+  // --- End Styles ---
 
-  // Styles
-  const containerStyle = { maxWidth: '900px', margin: '2rem auto', padding: '30px', backgroundColor: '#fff', borderRadius: '8px', boxShadow: 'var(--shadow-color)' };
-  const mainImageStyle = { width: '100%', maxHeight: '500px', objectFit: 'cover', marginBottom: '20px', borderRadius: '5px', border: '1px solid var(--border-color)' };
-  const thumbnailContainerStyle = { display: 'flex', gap: '10px', overflowX: 'auto', paddingBottom: '10px', marginBottom: '20px' };
-  const thumbnailStyle = { height: '90px', width: 'auto', borderRadius: '4px', cursor: 'pointer', border: '1px solid var(--border-color)' };
-  const detailSectionStyle = { marginBottom: '20px', paddingBottom: '15px', borderBottom: '1px solid var(--border-color)' };
-  const detailItemStyle = { marginBottom: '8px', fontSize: '1.05rem' };
-  const labelStyle = { fontWeight: '600', color: 'var(--text-dark)', minWidth: '120px', display: 'inline-block' };
-  const descriptionStyle = { whiteSpace: 'pre-wrap', lineHeight: '1.7', color: 'var(--text-light)' };
-  const buttonContainerStyle = { marginTop: '25px', paddingTop: '20px', borderTop: '1px solid var(--border-color)', display: 'flex', gap: '10px', flexWrap: 'wrap' }; // Added flexWrap
-  const buttonStyle = { padding: '10px 18px', cursor: 'pointer', border: 'none', borderRadius: '4px', fontWeight: '500', transition: 'background-color 0.2s ease' };
-  const editButtonStyle = { ...buttonStyle, backgroundColor: 'var(--accent-color, #ffc107)', color: '#fff'}; // Default yellow accent
-  const deleteButtonStyle = { ...buttonStyle, backgroundColor: 'var(--error-text, #dc3545)', color: '#fff'};
-  const bookButtonStyle = { ...buttonStyle, backgroundColor: 'var(--primary-color, #007bff)', color: '#fff'};
-  const errorStyle = { color: 'var(--error-text)', border: '1px solid var(--error-border)', padding: '15px', borderRadius: '5px', backgroundColor: 'var(--error-bg)'};
+  // --- Loading and Error States ---
+  if (loading) return <p className="content-wrapper" style={{ textAlign: 'center' }}>Loading property details...</p>;
+  if (error) return <div className="content-wrapper" style={errorBoxStyle}>Error fetching details: {error} <Link to="/properties">Back to list</Link></div>;
+  if (!property) return <p className="content-wrapper" style={{ textAlign: 'center' }}>Property not found. <Link to="/properties">Back to list</Link></p>;
+  // --- End Loading/Error States ---
 
-
-  if (loading) return <p className="content-wrapper" style={{textAlign: 'center'}}>Loading property details...</p>;
-  // Display error prominently if loading failed
-  if (error && !property) return <div className="content-wrapper" style={errorStyle}>Error: {error} <Link to="/properties">Back to list</Link></div>;
-  // Handle case where property is null after loading (e.g., 404)
-  if (!property) return <p className="content-wrapper" style={{textAlign: 'center'}}>Property not found. <Link to="/properties">Back to list</Link></p>;
-
-  // --- Calculate permissions ---
-  // Ensure property and property.owner exist before accessing nested properties
-  // Convert currentUserId from localStorage (string) to number for comparison if property.owner.id is number
-  const ownerId = property.owner ? property.owner.id : null;
-  const isOwner = ownerId !== null && String(ownerId) === currentUserId; // Compare as strings for safety
-  const isAdmin = currentUserRole === 'ADMIN';
+  // --- Calculate Permissions ---
+  const ownerId = property.owner?.id;
+  const isOwner = ownerId !== null && ownerId !== undefined && String(ownerId) === String(currentUserId);
   const isCustomer = currentUserRole === 'CUSTOMER';
+  // const isAdmin = currentUserRole === 'ADMIN';
 
   // --- Prepare Image URLs ---
-  const imageBaseUrl = "/uploads/"; // Path set in MvcConfig
+  const imageBaseUrl = "/uploads/";
+  const placeholderUrl = 'https://via.placeholder.com/800x500/cccccc/969696?text=No+Image+Available';
   const imageUrlsArray = (property.imageUrls && typeof property.imageUrls === 'string')
-                         ? property.imageUrls.split(',').map(name => `${imageBaseUrl}${name.trim()}`).filter(url => url !== imageBaseUrl) // Filter out empty results
-                         : [];
-  const mainImageUrl = imageUrlsArray.length > 0 ? imageUrlsArray[0] : 'https://via.placeholder.com/800x500/cccccc/969696?text=No+Image+Available';
+    ? property.imageUrls.split(',')
+        .map(name => name.trim()).filter(name => name)
+        .map(name => `${imageBaseUrl}${name}`)
+    : [];
+  const mainImageUrl = imageUrlsArray.length > 0 ? imageUrlsArray[0] : placeholderUrl;
 
-  const handleImageError = (e) => { /* ... as before ... */
-       if (e.target.src !== 'https://via.placeholder.com/800x500/cccccc/969696?text=No+Image+Available') {
-           e.target.onerror = null;
-           e.target.src = 'https://via.placeholder.com/800x500/cccccc/969696?text=Image+Load+Error';
-       } else { e.target.style.display = 'none'; }
+  // Image error handler
+  const handleImageError = (e) => {
+      console.warn(`[PropertyDetails] Image failed to load: ${e.target.src}. Replacing with placeholder.`);
+      if (e.target.src !== placeholderUrl) {
+          e.target.onerror = null;
+          e.target.src = placeholderUrl;
+      }
   };
 
+  // --- Render Logic ---
   return (
-    <div style={containerStyle}>
-      {/* Error display for actions on this page */}
-      {error && <div style={{...errorStyle, marginBottom: '20px'}}>Error: {error}</div>}
+    <div style={containerStyle} className="property-details-container">
+      {/* Display action errors (like delete failure) */}
+      {actionError && <div style={errorBoxStyle}>Action Error: {actionError}</div>}
 
-      {/* Main Image */}
-       <img src={mainImageUrl} alt={`${property.address || 'Property'} main view`} style={mainImageStyle} onError={handleImageError}/>
+      {/* --- Main Image --- */}
+      <img src={mainImageUrl} alt={`${property.address || 'Property'} main view`} style={mainImageStyle} onError={handleImageError}/>
 
-      {/* Thumbnail Gallery */}
+      {/* --- Thumbnails --- */}
       {imageUrlsArray.length > 1 && (
         <div style={thumbnailContainerStyle}>
-            {imageUrlsArray.map((url, index) => (
-                 <img key={index} src={url} alt={`Property view ${index + 1}`} style={thumbnailStyle} onError={(e) => { e.target.style.display='none'; }} />
-            ))}
+          {imageUrlsArray.map((url, index) => (
+            <img key={index} src={url} alt={`Thumbnail ${index + 1}`} style={thumbnailStyle} onError={handleImageError} />
+          ))}
         </div>
       )}
 
-      {/* Property Info */}
-      <div style={detailSectionStyle}>
-          <h2 style={{ marginBottom: '15px' }}>{property.address}</h2>
-          <div style={detailItemStyle}><span style={labelStyle}>Location:</span> {property.city}, {property.state} {property.postalCode}</div>
-          <div style={detailItemStyle}>
-              <span style={labelStyle}>Price:</span>
-              <span style={{ fontSize: '1.4em', fontWeight: 'bold', color: 'var(--primary-hover-color)' }}>
-                 ₹{property.price ? Number(property.price).toLocaleString('en-IN') : 'N/A'}
-                 {property.type === 'RENT' ? ' / month' : ''}
-              </span>
-          </div>
-          <div style={detailItemStyle}><span style={labelStyle}>Type:</span> {property.type}</div>
-          <div style={detailItemStyle}><span style={labelStyle}>Status:</span> {property.status}</div>
+      {/* --- Property Info Sections --- */}
+      <h2>{property.address || 'Address Not Available'}</h2>
+      <p style={detailItemStyle}> {property.city || 'N/A'}, {property.state || 'N/A'} {property.postalCode || ''} </p>
+      <div style={detailsSectionStyle}>
+        <h4>Key Details</h4>
+        <p style={detailItemStyle}> <span style={detailLabelStyle}>Price:</span> ₹{property.price ? Number(property.price).toLocaleString('en-IN') : 'N/A'} {property.type === 'RENT' && <span> / month</span>} </p>
+        <p style={detailItemStyle}><span style={detailLabelStyle}>Type:</span> {property.type || 'N/A'}</p>
+        <p style={detailItemStyle}><span style={detailLabelStyle}>Status:</span> {property.status || 'N/A'}</p>
+        <p style={detailItemStyle}> <span style={detailLabelStyle}>Beds:</span> {property.bedrooms ?? 'N/A'} | <span style={detailLabelStyle}> Baths:</span> {property.bathrooms ?? 'N/A'} | <span style={detailLabelStyle}> Area:</span> {property.areaSqft ? `${property.areaSqft} sqft` : 'N/A'} </p>
       </div>
-      {/* ... other detail sections ... */}
-       <div style={detailSectionStyle}>
-           <h3 style={{ marginBottom: '15px' }}>Key Features</h3>
-           <div style={detailItemStyle}><span style={labelStyle}>Bedrooms:</span> {property.bedrooms}</div>
-           <div style={detailItemStyle}><span style={labelStyle}>Bathrooms:</span> {property.bathrooms}</div>
-           <div style={detailItemStyle}><span style={labelStyle}>Area:</span> {property.areaSqft ? `${property.areaSqft} sqft` : 'N/A'}</div>
-      </div>
-       <div style={detailSectionStyle}>
-          <h3 style={{ marginBottom: '15px' }}>Description</h3>
-          <p style={descriptionStyle}>{property.description || 'No description available.'}</p>
-      </div>
-       <div style={{ fontSize: '0.9em', color: 'var(--text-muted)'}}>
-          <p>Listed By: {property.owner?.name || 'N/A'} ({property.owner?.email || 'N/A'})</p> {/* Use optional chaining */}
-          <p>Listed On: {property.createdAt ? new Date(property.createdAt).toLocaleDateString() : 'N/A'}</p>
-          {property.updatedAt && <p>Last Updated: {new Date(property.updatedAt).toLocaleDateString()}</p>}
-       </div>
+      {property.description && ( <div style={detailsSectionStyle}> <h4>Description</h4> <p style={{...detailItemStyle, whiteSpace: 'pre-wrap', lineHeight: '1.6'}}>{property.description}</p> </div> )}
+      {property.owner && ( <div style={detailsSectionStyle}> <h4>Listed By</h4> {!isOwner && ( <p style={detailItemStyle}><span style={detailLabelStyle}>Contact:</span> {property.owner.name || 'Owner/Agent'}</p> )} {isOwner && ( <p style={detailItemStyle}>This is your property listing.</p> )} </div> )}
 
-
-      {/* Booking Section */}
-      {isCustomer && property.status === 'AVAILABLE' && (
+      {/* --- Booking Section --- */}
+      {isCustomer && !isOwner && (property.status === 'AVAILABLE' || property.status === 'PENDING') && (
         <div style={{ marginTop: '20px', paddingTop: '15px', borderTop: '1px solid var(--border-color)' }}>
           <h4>Request a Visit</h4>
           {!showBookingForm ? (
             <button onClick={() => setShowBookingForm(true)} style={bookButtonStyle}>Request Visit</button>
           ) : (
-            <RequestBookingForm
-                propertyId={property.id}
-                onBookingSuccess={() => { alert('Booking request submitted!'); setShowBookingForm(false); }}
-                onCancel={() => setShowBookingForm(false)}
-             />
+            <RequestBookingForm propertyId={property.id} onBookingSuccess={() => { alert('Booking request submitted successfully!'); setShowBookingForm(false); }} onCancel={() => setShowBookingForm(false)}/>
           )}
         </div>
       )}
 
-      {/* Action Buttons - Check logic carefully */}
-      {(isOwner || isAdmin) && ( // Show buttons ONLY if owner or admin
-            <div style={buttonContainerStyle}>
-                 <Link to={`/properties/${id}/edit`} style={{ textDecoration: 'none' }}>
-                     <button style={editButtonStyle}>Edit Property</button>
-                 </Link>
-                 <button onClick={handleDelete} style={deleteButtonStyle}>Delete Property</button>
-            </div>
+      {/* --- Action Buttons (Owner Only) --- */}
+      {isOwner && (
+        <div style={buttonContainerStyle}>
+          <Link to={`/properties/${id}/edit`} style={{ textDecoration: 'none' }}> <button style={editButtonStyle}>Edit Property</button> </Link>
+          <button onClick={handleDelete} style={deleteButtonStyle}>Delete Property</button>
+        </div>
       )}
 
-      {/* Back Link */}
-      <div style={{ marginTop: '30px' }}>
-        <Link to="/properties">← Back to Properties List</Link>
-      </div>
+      {/* --- Back Link --- */}
+      <div style={{ marginTop: '30px' }}> <Link to="/properties" style={{ color: 'var(--primary-color)', textDecoration: 'none' }}> ← Back to Properties List </Link> </div>
     </div>
   );
 }
