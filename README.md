@@ -2,10 +2,6 @@
 
 A comprehensive web platform designed to streamline the process of searching, listing, managing, and booking real estate properties. This system caters to different user roles: Customers looking for properties, Property Owners managing their listings, and Administrators overseeing the platform.
 
-## Problem Statement
-
-The traditional process of searching for, listing, and managing real estate properties often suffers from inefficiency and fragmentation. Prospective buyers and renters struggle with scattered listings, difficulty in scheduling viewings, and accessing comprehensive property details, while property owners face challenges in reaching a wide audience, managing inquiries, updating listings effectively, and coordinating visits. Furthermore, the lack of a centralized, secure platform with distinct user roles makes oversight and streamlined communication difficult, leading to potential delays and missed opportunities for all parties involved in a real estate transaction. This necessitates a digital solution to bridge the gap between property seekers, owners, and administrators, simplifying the entire property management lifecycle. This project aims to develop a Real Estate Management System using Java and MySQL that provides a secure, efficient, and user-friendly platform where buyers can browse available properties and book visits, while admins can manage listings. 
-
 ## Features
 
 **General:**
