@@ -31,7 +31,7 @@ A comprehensive web platform designed to streamline the process of searching, li
 *   **Admin Panel:** Centralized dashboard for platform oversight.
 *   **View All Properties:** Access a list of all properties registered on the platform, regardless of owner or status.
 *   **Delete Any Property:** Ability to remove property listings for moderation or platform management.
-    *   *(Note: Admin Edit functionality is currently disabled in the UI but could be added)*.
+    *(Note: Admin Edit functionality is currently disabled in the UI but could be added)*.
 *   **View All Bookings (Optional):** Can view all booking requests across the system (if implemented).
 
 ## Technology Stack
