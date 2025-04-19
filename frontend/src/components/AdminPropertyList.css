@@ -1,0 +1,68 @@
+/* frontend/src/components/AdminPropertyList.css */
+
+/* Base style for all action buttons in the admin table */
+.admin-action-btn {
+    font-size: 0.85em;          /* Slightly smaller text */
+    padding: 5px 10px;         /* Adjust padding */
+    margin-right: 6px;         /* Space between buttons */
+    margin-bottom: 4px;        /* Space below buttons if they wrap */
+    cursor: pointer;
+    border-radius: 4px;
+    border: 1px solid transparent;
+    white-space: nowrap;       /* Prevent text wrapping */
+    font-weight: 500;
+    text-align: center;
+    vertical-align: middle;    /* Align if wrapped */
+    display: inline-block;     /* Allow margins/padding */
+    transition: background-color 0.2s ease, border-color 0.2s ease, transform 0.1s ease, box-shadow 0.2s ease; /* Smooth transitions */
+}
+
+/* Make buttons slightly interactive on focus/hover */
+.admin-action-btn:hover:not(:disabled),
+.admin-action-btn:focus {
+    transform: translateY(-1px); /* Slight lift effect */
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.15); /* Subtle shadow */
+}
+
+.admin-action-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+/* Specific style for the Delete button */
+.admin-btn-delete {
+    background-color: var(--error-bg); /* Use theme error background */
+    color: var(--error-text);       /* Use theme error text */
+    border-color: var(--error-border); /* Use theme error border */
+}
+
+/* Hover style for Delete button */
+.admin-btn-delete:hover:not(:disabled) {
+    background-color: #dc3545; /* A common darker red */
+    border-color: #bd2c3a;
+    color: #fff; /* Ensure text stays white */
+}
+
+/* Specific style for the View button */
+.admin-btn-view {
+    background-color: var(--secondary-color); /* Use theme secondary background */
+    color: var(--text-dark);             /* Use theme dark text */
+    border-color: var(--secondary-hover-color); /* Use slightly darker border */
+}
+
+/* Hover style for View button */
+.admin-btn-view:hover:not(:disabled) {
+    background-color: var(--secondary-hover-color); /* Darken background on hover */
+    border-color: #5a6268; /* Example darker border */
+    color: var(--text-dark); /* Keep text color consistent */
+}
+
+/* Optional: Ensure the container allows horizontal scrolling if needed */
+.admin-property-list > div[style*="overflowX: auto"] {
+  margin-top: 10px;
+}
+
+/* Ensure table cells don't force excessive width */
+.admin-property-list td:last-child { /* Target the Actions column */
+   min-width: 120px; /* Adjust as needed based on button sizes */
+}
