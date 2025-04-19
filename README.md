@@ -67,115 +67,168 @@ The traditional process of searching for, listing, and managing real estate prop
 *   MySQL Server 8.0+
 *   Git
 
-**1. Backend Setup:**
+## 🛠️ Project Setup
 
-   ```bash
-   # 1. Clone the repository
-   git clone <your-repository-url>
-   cd <repository-folder>/backend # Or your backend project root folder
+### 1. Clone the Repository
 
-   # 2. Configure Database Connection
-   #    - Open src/main/resources/application.properties
-   #    - Update the following properties with your MySQL details:
-   #      spring.datasource.url=jdbc:mysql://localhost:3306/realestate # Ensure 'realestate' DB exists
-   #      spring.datasource.username=your_mysql_username
-   #      spring.datasource.password=your_mysql_password
+```bash
+git clone <your-repository-url>
+cd <repository-folder>/backend
+```
 
-   # 3. Database Schema:
-   #    - Manually create the 'realestate' database in your MySQL server.
-   #    - Ensure 'spring.jpa.hibernate.ddl-auto' is set to 'update' (for development)
-   #      in application.properties. Spring Boot/Hibernate will attempt to create/update tables.
-   #    - **OR** If you created the property_amenities table manually, set ddl-auto to 'validate' or 'none'.
+> Replace `<your-repository-url>` with your actual GitHub repo URL.
 
-   # 4. Build (Optional - mvnw run compiles automatically)
-   # ./mvnw clean package -DskipTests
+---
 
-   # 5. Run the Spring Boot application
-   ./mvnw spring-boot:run
+## ⚙️ Backend Setup (Spring Boot)
 
+### 2. Configure Database Connection
 
-The backend server should start on http://localhost:8081 (or the port specified in application.properties).
+Open the file:
 
-2. Frontend Setup:
+```text
+src/main/resources/application.properties
+```
 
-# 1. Navigate to the frontend directory
-cd ../frontend # Or your frontend project root folder
+Update with your MySQL configuration:
 
-# 2. Install dependencies
+```properties
+spring.datasource.url=jdbc:mysql://localhost:3306/realestate
+spring.datasource.username=your_mysql_username
+spring.datasource.password=your_mysql_password
+```
+
+> Ensure the `realestate` database exists in your MySQL server.
+
+---
+
+### 3. Database Schema
+
+Manually create the `realestate` database in your MySQL server.
+
+For development:
+
+```properties
+spring.jpa.hibernate.ddl-auto=update
+```
+
+If you’ve created tables like `property_amenities` manually, use:
+
+```properties
+spring.jpa.hibernate.ddl-auto=validate
+```
+
+or
+
+```properties
+spring.jpa.hibernate.ddl-auto=none
+```
+
+---
+
+### 4. Build the Project (Optional)
+
+```bash
+./mvnw clean package -DskipTests
+```
+
+---
+
+### 5. Run the Spring Boot Application
+
+```bash
+./mvnw spring-boot:run
+```
+
+> The backend server should start on: `http://localhost:8081`
+
+---
+
+## 💻 Frontend Setup (React.js)
+
+### 1. Navigate to the Frontend Directory
+
+```bash
+cd ../frontend
+```
+
+---
+
+### 2. Install Dependencies
+
+```bash
 npm install
+```
 
-# 3. Start the React development server
+---
+
+### 3. Start the React Development Server
+
+```bash
 npm start
-IGNORE_WHEN_COPYING_START
-content_copy
-download
-Use code with caution.
-Bash
-IGNORE_WHEN_COPYING_END
+```
 
-The frontend development server should start on http://localhost:3001 (or the next available port). The proxy setting in package.json should automatically forward API requests to the backend on port 8081.
+> The frontend will run on: `http://localhost:3001`  
+> Proxy settings in `package.json` will route API calls to the backend server on port `8081`.
 
-Running the Application
+---
 
-Start the MySQL Database Server.
+## 🚀 Running the Application
 
-Start the Spring Boot Backend application (./mvnw spring-boot:run). Wait for it to initialize successfully.
+1. Start your **MySQL** database server.
+2. Run the **Spring Boot** backend:
 
-Start the React Frontend application (npm start).
+```bash
+./mvnw spring-boot:run
+```
 
-Open your web browser and navigate to http://localhost:3001.
+3. Start the **React** frontend:
 
-API Endpoints Overview
+```bash
+npm start
+```
 
-/api/users/ (Register, Login, Test Auth)
+4. Open your browser and go to: `http://localhost:3001`
 
-/api/public/ (Public actions like Contact Form)
+---
 
-/api/properties/ (General GET for list/details, POST for create)
+## 🔗 API Endpoints Overview
 
-/api/owner/properties/ (PUT, DELETE, POST images for owner-specific actions)
+| Endpoint Group             | Description                                         |
+|----------------------------|-----------------------------------------------------|
+| `/api/users/`              | Register, Login, Test Auth                          |
+| `/api/public/`             | Public actions like Contact Form                    |
+| `/api/properties/`         | GET list/details, POST create property              |
+| `/api/owner/properties/`   | PUT, DELETE, POST images (owner-specific actions)   |
+| `/api/bookings/`           | POST booking, PATCH status, GET user bookings       |
+| `/api/admin/`              | Admin actions (GET all properties, DELETE any)      |
+| `/uploads/`                | Serves uploaded property images                     |
 
-/api/bookings/ (POST create booking, PATCH status, GET user-specific bookings)
+---
 
-/api/admin/ (Admin-specific actions like GET all properties, DELETE any property)
+## 🧱 Architecture & Design
 
-/uploads/ (Serves uploaded property images - requires backend configuration)
+### Architecture
+- Client-Server
+- Layered Architecture
+- MVC (Spring Boot)
+- RESTful API
 
-Architecture & Design
+### Design Principles
+- **SOLID**: SRP, OCP, LSP, ISP, DIP
+- **GRASP**: Information Expert, Creator, Controller, Low Coupling, High Cohesion
 
-The application follows standard web architecture patterns and design principles:
+### Design Patterns
+- **Backend**: Repository Pattern, Service Layer, DTO, Dependency Injection
+- **Frontend**: Component Pattern, Hook Pattern (React)
 
-Architecture: Client-Server, Layered Architecture, MVC (Backend), RESTful API.
+---
 
-Design Principles: SOLID (SRP, OCP, LSP, ISP, DIP) and GRASP (Information Expert, Creator, Controller, Low Coupling, High Cohesion) principles were considered to promote maintainability, testability, and separation of concerns. Key examples include separating controller/service/repository layers, using dependency injection, and assigning responsibilities appropriately.
+## 👥 Submitted By
 
-Design Patterns: Repository Pattern (Spring Data JPA), Service Layer, Data Transfer Object (DTO), Dependency Injection (Spring), Component Pattern (React), Hook Pattern (React).
+- **Rutuja Bhagat** – PES1UG23CS808  
+- **Bhoomika R P** – PES1UG23CS809  
+- **Harshita Gujjar** – PES1UG23CS810  
+- **Hemavathi V M** – PES1UG23CS811
 
-Submitted by:
-
-Rutuja Bhagat : PES1UG23CS808
-
-Bhoomika R P : PES1UG23CS809
-
-Harshita Gujjar : PES1UG23CS810
-
-Hemavathi V M : PES1UG23CS811
-
-License
-
-[Specify Your License Here - e.g., MIT, Apache 2.0, None]
-
-**To Use:**
-
-1.  Copy the entire content above.
-2.  Create a file named `README.md` in the **root directory** of your GitHub project (the main folder containing both your `frontend` and `backend` subdirectories).
-3.  Paste the copied content into the `README.md` file.
-4.  Save the file.
-5.  Commit and push the `README.md` file to your GitHub repository. GitHub will automatically render it on your repository's main page.
-6.  **Remember to replace `<your-repository-url>`** in the setup instructions if you include the clone command.
-7.  **Choose and specify a license** in the License section, or remove that section if you don't want to specify one yet.
-IGNORE_WHEN_COPYING_START
-content_copy
-download
-Use code with caution.
-IGNORE_WHEN_COPYING_END
+---
