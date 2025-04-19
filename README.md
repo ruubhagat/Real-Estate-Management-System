@@ -57,7 +57,7 @@ The traditional process of searching for, listing, and managing real estate prop
 *   **Database:**
     *   MySQL 8.0+
 
-## Setup and Installation
+## 🛠️ Project Setup
 
 **Prerequisites:**
 
@@ -66,8 +66,6 @@ The traditional process of searching for, listing, and managing real estate prop
 *   Node.js (includes npm) v18+ or v20+
 *   MySQL Server 8.0+
 *   Git
-
-## 🛠️ Project Setup
 
 ### 1. Clone the Repository
 
