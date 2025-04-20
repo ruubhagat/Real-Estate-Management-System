@@ -3,8 +3,10 @@ package com.example.demo.repository;
 import com.example.demo.model.Booking;
 import com.example.demo.model.Property;
 import com.example.demo.model.User;
-import com.example.demo.model.enums.BookingStatus; // Import enum
+import com.example.demo.model.enums.BookingStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query; // Import Query
+import org.springframework.data.repository.query.Param; // Import Param
 import org.springframework.stereotype.Repository;
 
 import java.time.LocalDate;
@@ -14,29 +16,34 @@ import java.util.Optional;
 @Repository
 public interface BookingRepository extends JpaRepository<Booking, Long> {
 
-    // Find bookings made by a specific customer
+    // --- VVV Methods using JOIN FETCH for Eager Loading VVV ---
+
+    /** Finds bookings by customer, eagerly fetching Property and its Owner, and Customer. Ordered by creation date descending. */
+    @Query("SELECT b FROM Booking b JOIN FETCH b.property p JOIN FETCH p.owner JOIN FETCH b.customer WHERE b.customer = :customer ORDER BY b.createdAt DESC")
+    List<Booking> findByCustomerWithDetails(@Param("customer") User customer);
+
+    /** Finds bookings by property owner, eagerly fetching Property and Customer. Ordered by creation date descending. */
+    @Query("SELECT b FROM Booking b JOIN FETCH b.property p JOIN FETCH b.customer WHERE p.owner = :owner ORDER BY b.createdAt DESC")
+    List<Booking> findByPropertyOwnerWithDetails(@Param("owner") User owner);
+
+    /** Finds all bookings, eagerly fetching Property, its Owner, and Customer. Ordered by creation date descending. (For Admin) */
+    @Query("SELECT b FROM Booking b JOIN FETCH b.property p JOIN FETCH p.owner JOIN FETCH b.customer ORDER BY b.createdAt DESC")
+    List<Booking> findAllWithDetails();
+
+    /** Finds a single booking by ID, eagerly fetching Property, its Owner, and Customer. */
+    @Query("SELECT b FROM Booking b JOIN FETCH b.property p JOIN FETCH p.owner JOIN FETCH b.customer WHERE b.id = :id")
+    Optional<Booking> findByIdWithDetails(@Param("id") Long id);
+
+    // --- ^^^ END Methods using JOIN FETCH ^^^ ---
+
+
+    // Original simple finders (might be used elsewhere or can be removed if WithDetails covers all cases)
     List<Booking> findByCustomer(User customer);
-
-    // Find bookings related to a specific property
-    List<Booking> findByProperty(Property property);
-
-    // Find bookings for a specific property owned by a specific user (Property Owner view)
     List<Booking> findByPropertyOwner(User owner);
-
-    // Find bookings by status
+    List<Booking> findByProperty(Property property);
     List<Booking> findByStatus(BookingStatus status);
-
-    // Example: Find potentially conflicting bookings for a property on a specific date
-    List<Booking> findByPropertyAndVisitDateAndStatusIn(
-            Property property,
-            LocalDate visitDate,
-            List<BookingStatus> statuses // e.g., find PENDING or CONFIRMED
-    );
-
-    // Find a specific booking by ID and Customer (for customer actions like cancelling)
+    List<Booking> findByPropertyAndVisitDateAndStatusIn(Property property, LocalDate visitDate, List<BookingStatus> statuses);
     Optional<Booking> findByIdAndCustomer(Long id, User customer);
-
-    // Find a specific booking by ID and Property Owner (for owner actions)
     Optional<Booking> findByIdAndPropertyOwner(Long id, User owner);
 
 }

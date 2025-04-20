@@ -15,11 +15,12 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.security.access.AccessDeniedException;
 
 import java.util.List;
 import java.util.Optional;
 
-@Service
+@Service("bookingService")
 public class BookingService {
 
     private static final Logger logger = LoggerFactory.getLogger(BookingService.class);
@@ -28,201 +29,154 @@ public class BookingService {
     @Autowired private PropertyRepository propertyRepository;
     @Autowired private UserRepository userRepository;
 
-    /**
-     * Creates a booking request for a property visit.
-     * Associates the booking with the currently logged-in customer.
-     * @param propertyId The ID of the property to book.
-     * @param bookingRequest Booking object containing visitDate, visitTime, customerNotes.
-     * @return The created Booking object.
-     * @throws IllegalArgumentException if property not found or user not authenticated/found.
-     */
+    // --- Create Booking ---
     @Transactional
     public Booking createBooking(Long propertyId, Booking bookingRequest) {
-        // 1. Get current user (customer)
-        String customerEmail = getCurrentUsername()
-                .orElseThrow(() -> new SecurityException("User must be logged in to create a booking."));
-        User customer = userRepository.findByEmail(customerEmail)
-                .orElseThrow(() -> new UsernameNotFoundException("Customer not found: " + customerEmail));
-
-        // 2. Get the property
-        Property property = propertyRepository.findById(propertyId)
-                .orElseThrow(() -> new IllegalArgumentException("Property not found with ID: " + propertyId));
-
-        // 3. Populate the booking object
+        String customerEmail=getCurrentUsername().orElseThrow(()->new AccessDeniedException("Login required"));
+        User customer=userRepository.findByEmail(customerEmail).orElseThrow(()->new UsernameNotFoundException("User not found"));
+        Property property=propertyRepository.findById(propertyId).orElseThrow(()->new IllegalArgumentException("Property not found"));
+        if(property.getOwner().equals(customer)) throw new IllegalArgumentException("Cannot book own property");
+        if(property.getStatus()!=com.example.demo.model.enums.PropertyStatus.AVAILABLE) throw new IllegalArgumentException("Property not available");
         Booking newBooking = new Booking();
-        newBooking.setCustomer(customer);
-        newBooking.setProperty(property);
-        newBooking.setVisitDate(bookingRequest.getVisitDate());
-        newBooking.setVisitTime(bookingRequest.getVisitTime());
+        newBooking.setCustomer(customer); newBooking.setProperty(property);
+        newBooking.setVisitDate(bookingRequest.getVisitDate()); newBooking.setVisitTime(bookingRequest.getVisitTime());
         newBooking.setCustomerNotes(bookingRequest.getCustomerNotes());
-        // Status (PENDING) and createdAt are set by @PrePersist
-
-        // 4. Save the booking
-        Booking savedBooking = bookingRepository.save(newBooking);
-        logger.info("Booking created with ID {} for property ID {} by customer {}",
-                savedBooking.getId(), propertyId, customerEmail);
-
-        // TODO: Implement notification logic (e.g., email owner) here
-
-        return savedBooking;
+        return bookingRepository.save(newBooking);
     }
 
-    /**
-     * Updates the status of an existing booking.
-     * Performs authorization checks based on who is updating.
-     * @param bookingId The ID of the booking to update.
-     * @param newStatus The new status to set.
-     * @param notes Optional notes related to the status update (e.g., reason for cancellation).
-     * @return The updated Booking object.
-     * @throws IllegalArgumentException if booking not found.
-     * @throws SecurityException if the user lacks permission to update the status.
-     */
+    // --- Update MAIN Booking Status ---
     @Transactional
     public Booking updateBookingStatus(Long bookingId, BookingStatus newStatus, String notes) {
-        // 1. Find the booking
-        Booking booking = bookingRepository.findById(bookingId)
-                .orElseThrow(() -> new IllegalArgumentException("Booking not found with ID: " + bookingId));
-
-        // 2. Authorization: Who can change the status?
-        String currentUserEmail = getCurrentUsername()
-                .orElseThrow(() -> new SecurityException("Authentication required."));
-        User currentUser = userRepository.findByEmail(currentUserEmail)
-                .orElseThrow(() -> new UsernameNotFoundException("Current user not found: " + currentUserEmail));
-
-
-        boolean isAdmin = currentUser.getRole().equals("ADMIN");
-        boolean isOwner = booking.getProperty().getOwner().equals(currentUser);
-        boolean isCustomer = booking.getCustomer().equals(currentUser);
-
-        // Define allowed transitions (example logic, adjust as needed)
+        Booking booking=bookingRepository.findById(bookingId).orElseThrow(()->new IllegalArgumentException("Booking not found"));
+        verifyBookingOwnershipOrAdmin(booking); // Check permission first
         switch (newStatus) {
-            case CONFIRMED:
-            case REJECTED:
-                if (!isOwner && !isAdmin) {
-                    logger.warn("User {} (Customer? {}) attempted to confirm/reject booking {}", currentUserEmail, isCustomer, bookingId);
-                    throw new SecurityException("Only the property owner or admin can confirm/reject bookings.");
-                }
-                booking.setOwnerAgentNotes(notes); // Owner/Admin notes
-                break;
-            case CANCELLED:
-                if (!isCustomer && !isOwner && !isAdmin) { // Customer, Owner, or Admin can cancel
-                    logger.warn("Unauthorized attempt to cancel booking {} by user {}", bookingId, currentUserEmail);
-                    throw new SecurityException("User does not have permission to cancel this booking.");
-                }
-                // Add appropriate note based on who cancelled
-                if (isCustomer) booking.setCustomerNotes("Cancelled by customer: " + notes);
-                else booking.setOwnerAgentNotes("Cancelled by owner/admin: " + notes);
-                break;
-            case COMPLETED:
-                if (!isOwner && !isAdmin) { // Only Owner/Admin can mark as completed
-                    logger.warn("Unauthorized attempt to mark booking {} as completed by user {}", bookingId, currentUserEmail);
-                    throw new SecurityException("Only the property owner or admin can mark bookings as completed.");
-                }
-                booking.setOwnerAgentNotes(notes);
-                break;
-            case PENDING:
-                // Usually shouldn't revert to PENDING manually, but might be needed
-                if (!isAdmin) { // Only admin can reset to pending?
-                    throw new SecurityException("Only an admin can reset a booking to PENDING.");
-                }
-                break;
-            default:
-                throw new IllegalArgumentException("Unsupported status transition.");
+            case CONFIRMED: case REJECTED: booking.setOwnerAgentNotes(notes); break;
+            case CANCELLED: booking.setCustomerNotes("Cancelled by customer/owner/admin: " + notes); break; // Simplified note
+            case COMPLETED: booking.setOwnerAgentNotes(notes); break;
+            case PENDING: if(!SecurityContextHolder.getContext().getAuthentication().getAuthorities().stream().anyMatch(a->a.getAuthority().equals("ROLE_ADMIN"))) throw new AccessDeniedException("Admin only"); break;
+            default: throw new IllegalArgumentException("Unsupported status");
         }
-
-        // 3. Update status and save
         booking.setStatus(newStatus);
-        Booking updatedBooking = bookingRepository.save(booking);
-        logger.info("Booking ID {} status updated to {} by user {}", bookingId, newStatus, currentUserEmail);
+        return bookingRepository.save(booking);
+    }
 
-        // TODO: Implement notification logic (e.g., email customer/owner) here
-
-        return updatedBooking;
+    // --- Update Payment Status ---
+    @Transactional
+    public Booking updatePaymentStatus(Long bookingId, String newPaymentStatus) {
+        Booking booking=bookingRepository.findById(bookingId).orElseThrow(()->new IllegalArgumentException("Booking not found"));
+        verifyBookingOwnershipOrAdmin(booking);
+        if (!"RECEIVED".equalsIgnoreCase(newPaymentStatus) && !"PENDING".equalsIgnoreCase(newPaymentStatus)) throw new IllegalArgumentException("Invalid payment status");
+        booking.setPaymentStatus(newPaymentStatus.toUpperCase());
+        return bookingRepository.save(booking);
     }
 
 
-    // --- Retrieval Methods (with Authorization Considerations) ---
-
-    /**
-     * Finds bookings made by the currently logged-in customer.
-     * @return List of bookings for the current customer.
-     */
+    // --- Retrieval Methods ---
     @Transactional(readOnly = true)
     public List<Booking> findMyBookingsAsCustomer() {
-        String customerEmail = getCurrentUsername()
-                .orElseThrow(() -> new SecurityException("Authentication required."));
-        User customer = userRepository.findByEmail(customerEmail)
-                .orElseThrow(() -> new UsernameNotFoundException("Customer not found: " + customerEmail));
-
-        return bookingRepository.findByCustomer(customer);
+        logger.debug("Fetching bookings with details for current customer");
+        String customerEmail = getCurrentUsername().orElseThrow(() -> new AccessDeniedException("Auth required."));
+        User customer = userRepository.findByEmail(customerEmail).orElseThrow(() -> new UsernameNotFoundException("Customer not found"));
+        return bookingRepository.findByCustomerWithDetails(customer);
     }
 
-    /**
-     * Finds bookings related to properties owned by the currently logged-in user (Property Owner).
-     * @return List of bookings for properties owned by the current user.
-     */
     @Transactional(readOnly = true)
     public List<Booking> findMyBookingsAsOwner() {
-        String ownerEmail = getCurrentUsername()
-                .orElseThrow(() -> new SecurityException("Authentication required."));
-        User owner = userRepository.findByEmail(ownerEmail)
-                .orElseThrow(() -> new UsernameNotFoundException("Owner not found: " + ownerEmail));
-
-        return bookingRepository.findByPropertyOwner(owner);
+        logger.debug("Fetching bookings with details for current property owner");
+        String ownerEmail = getCurrentUsername().orElseThrow(() -> new AccessDeniedException("Auth required."));
+        User owner = userRepository.findByEmail(ownerEmail).orElseThrow(() -> new UsernameNotFoundException("Owner not found"));
+        return bookingRepository.findByPropertyOwnerWithDetails(owner);
     }
 
-    /**
-     * Finds a specific booking by ID. Includes authorization check.
-     * Allows retrieval by Customer, Property Owner, or Admin.
-     * @param bookingId The ID of the booking.
-     * @return Optional containing the Booking if found and authorized.
-     */
     @Transactional(readOnly = true)
     public Optional<Booking> findBookingByIdWithAuth(Long bookingId) {
-        String currentUserEmail = getCurrentUsername()
-                .orElseThrow(() -> new SecurityException("Authentication required."));
-        User currentUser = userRepository.findByEmail(currentUserEmail)
-                .orElseThrow(() -> new UsernameNotFoundException("Current user not found: " + currentUserEmail));
-
-        Optional<Booking> bookingOpt = bookingRepository.findById(bookingId);
-
+        logger.debug("Fetching booking by ID {} with details and auth check", bookingId);
+        Optional<Booking> bookingOpt = bookingRepository.findByIdWithDetails(bookingId); // Uses JOIN FETCH
         if (bookingOpt.isPresent()) {
-            Booking booking = bookingOpt.get();
-            boolean isAdmin = currentUser.getRole().equals("ADMIN");
-            boolean isOwner = booking.getProperty().getOwner().equals(currentUser);
-            boolean isCustomer = booking.getCustomer().equals(currentUser);
-
-            if (isAdmin || isOwner || isCustomer) {
-                return bookingOpt; // Authorized
-            } else {
-                logger.warn("Unauthorized attempt to access booking ID {} by user {}", bookingId, currentUserEmail);
-                throw new SecurityException("User does not have permission to view this booking.");
+            try {
+                verifyBookingViewerPermissions(bookingOpt.get());
+                return bookingOpt;
+            } catch (AccessDeniedException e) {
+                logger.warn("Unauthorized VIEW attempt for booking ID {}", bookingId);
+                return Optional.empty();
             }
         }
-        return Optional.empty(); // Not found
+        return Optional.empty();
     }
 
-    /**
-     * Finds all bookings (ADMIN ONLY).
-     * @return List of all bookings.
-     * @throws SecurityException if the current user is not an ADMIN.
-     */
     @Transactional(readOnly = true)
     public List<Booking> findAllBookingsAdmin() {
-        String currentUserEmail = getCurrentUsername()
-                .orElseThrow(() -> new SecurityException("Authentication required."));
-        User currentUser = userRepository.findByEmail(currentUserEmail)
-                .orElseThrow(() -> new UsernameNotFoundException("Current user not found: " + currentUserEmail));
-
-        if (!currentUser.getRole().equals("ADMIN")) {
-            logger.warn("Non-admin user {} attempted to access all bookings.", currentUserEmail);
-            throw new SecurityException("User does not have permission to view all bookings.");
-        }
-        return bookingRepository.findAll();
+        logger.debug("Fetching all bookings with details for admin");
+        String currentUserEmail = getCurrentUsername().orElseThrow(()-> new AccessDeniedException("Auth required."));
+        User currentUser = userRepository.findByEmail(currentUserEmail).orElseThrow(() -> new UsernameNotFoundException("User not found"));
+        if (!currentUser.getRole().equals("ADMIN")) { throw new AccessDeniedException("Admin role required."); }
+        return bookingRepository.findAllWithDetails(); // Uses JOIN FETCH
     }
 
 
-    // --- Helper Method ---
+    // --- Security Helper Methods ---
+
+    /** Checks if current user owns the booked property OR is ADMIN. Throws AccessDeniedException if not. */
+    public void verifyBookingOwnershipOrAdmin(Booking booking) {
+        String currentUserEmail = getCurrentUsername().orElseThrow(() -> new AccessDeniedException("Authentication required."));
+        User currentUser = userRepository.findByEmail(currentUserEmail).orElseThrow(() -> new UsernameNotFoundException("User not found: " + currentUserEmail));
+        boolean isAdmin = currentUser.getRole().equals("ADMIN");
+        boolean isOwner = false;
+        if (booking.getProperty() != null && booking.getProperty().getOwner() != null) {
+            isOwner = booking.getProperty().getOwner().equals(currentUser);
+        } else {
+            logger.warn("Could not determine property owner for booking ID {} during auth check.", booking.getId());
+            // --- VVV FIX: Provide error message string VVV ---
+            throw new AccessDeniedException("Cannot verify ownership due to missing booking property/owner data.");
+            // --- ^^^ END FIX ^^^ ---
+        }
+        if (!isAdmin && !isOwner) {
+            logger.warn("Unauthorized attempt to modify booking ID {} by non-owner/non-admin user {}", booking.getId(), currentUserEmail);
+            throw new AccessDeniedException("User does not have permission to modify this booking.");
+        }
+        logger.debug("Modify permission verified for booking ID {} by user {}", booking.getId(), currentUserEmail);
+    }
+
+    /** Checks if current user can VIEW the booking (Customer, Owner, or Admin). Throws AccessDeniedException if not. */
+    private void verifyBookingViewerPermissions(Booking booking) {
+        String currentUserEmail = getCurrentUsername().orElseThrow(() -> new AccessDeniedException("Authentication required."));
+        User currentUser = userRepository.findByEmail(currentUserEmail).orElseThrow(() -> new UsernameNotFoundException("User not found: " + currentUserEmail));
+        boolean isAdmin = currentUser.getRole().equals("ADMIN");
+        boolean isOwner = false;
+        boolean isCustomer = false;
+        if (booking.getProperty() != null && booking.getProperty().getOwner() != null) {
+            isOwner = booking.getProperty().getOwner().equals(currentUser);
+        }
+        if (booking.getCustomer() != null) {
+            isCustomer = booking.getCustomer().equals(currentUser);
+        }
+        if (!isAdmin && !isOwner && !isCustomer) {
+            logger.warn("Unauthorized attempt to VIEW booking ID {} by user {}", booking.getId(), currentUserEmail);
+            throw new AccessDeniedException("User does not have permission to view this booking.");
+        }
+        logger.debug("View permission verified for booking ID {} by user {}", booking.getId(), currentUserEmail);
+    }
+
+    // Method for @PreAuthorize check by ID
+    @Transactional(readOnly = true)
+    public boolean checkBookingOwnershipOrAdmin(Long bookingId) {
+        Booking booking = bookingRepository.findById(bookingId)
+                .orElseThrow(() -> new IllegalArgumentException("Booking check failed: Booking not found with ID: " + bookingId));
+        try {
+            // Logging moved inside verify method for clarity if needed
+            verifyBookingOwnershipOrAdmin(booking);
+            logger.info("[PreAuth Check] Result for booking ID {}: true (Verification Passed)", bookingId);
+            return true;
+        } catch (AccessDeniedException | UsernameNotFoundException e) {
+            logger.warn("[PreAuth Check] Result for booking ID {}: false (Reason: {})", bookingId, e.getMessage());
+            return false;
+        } catch (Exception e) {
+            logger.error("[PreAuth Check] Unexpected error during check for booking {}: {}", bookingId, e.getMessage(), e);
+            return false;
+        }
+    }
+
+    // Helper Method to get current username
     private Optional<String> getCurrentUsername() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         if (authentication == null || !authentication.isAuthenticated() || "anonymousUser".equals(authentication.getPrincipal())) {

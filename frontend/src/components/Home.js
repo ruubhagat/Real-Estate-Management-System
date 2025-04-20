@@ -141,7 +141,7 @@ function Home() {
             <div className="contact-info-item">
                 <h4>Phone</h4>
                 <p><a href="tel:+91123456789">+91-1234567890</a></p> {/* Replace with actual phone */}
-                <p>Mon - Fri, 11am - 5pm IST</p> {/* Updated Timings */}
+                <p>Mon - Fri, 11 am - 5 pm IST</p> {/* Updated Timings */}
             </div>
             <div className="contact-info-item">
                 <h4>Email</h4>

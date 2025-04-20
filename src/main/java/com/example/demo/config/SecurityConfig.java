@@ -16,6 +16,7 @@ import org.springframework.security.config.annotation.method.configuration.Enabl
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
+import org.springframework.security.config.annotation.web.configurers.HeadersConfigurer; // Often needed if disabling CSRF
 import org.springframework.security.config.annotation.web.configurers.RequestCacheConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
@@ -50,7 +51,6 @@ public class SecurityConfig {
 
     /**
      * Defines the PasswordEncoder bean using BCrypt.
-     * Used for hashing passwords during registration and verifying them during login.
      */
     @Bean
     public PasswordEncoder passwordEncoder() {
@@ -59,8 +59,6 @@ public class SecurityConfig {
 
     /**
      * Defines the AuthenticationProvider bean (DaoAuthenticationProvider).
-     * Uses the custom UserDetailsService and PasswordEncoder to authenticate users
-     * based on credentials stored in the database.
      */
     @Bean
     public AuthenticationProvider authenticationProvider() {
@@ -80,21 +78,17 @@ public class SecurityConfig {
 
     /**
      * Configures Cross-Origin Resource Sharing (CORS) settings.
-     * Allows requests from the specified frontend origin (e.g., http://localhost:3001).
      */
     @Bean
     CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
         configuration.setAllowedOrigins(List.of(allowedOrigin)); // Read from properties
-        // Specify allowed HTTP methods
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS", "HEAD", "PATCH"));
-        // Specify allowed headers in requests
         configuration.setAllowedHeaders(Arrays.asList("Authorization", "Cache-Control", "Content-Type", "X-Requested-With", "Accept", "Origin"));
-        configuration.setAllowCredentials(true); // Allow cookies/auth headers
-        configuration.setMaxAge(3600L); // How long pre-flight response can be cached
-        // Apply this configuration to all paths
+        configuration.setAllowCredentials(true);
+        configuration.setMaxAge(3600L);
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
-        source.registerCorsConfiguration("/**", configuration);
+        source.registerCorsConfiguration("/**", configuration); // Apply CORS to all paths
         return source;
     }
 
@@ -104,55 +98,59 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
-                .cors(Customizer.withDefaults()) // Apply the CORS configuration bean defined above
-                .csrf(AbstractHttpConfigurer::disable) // Disable CSRF protection (common for stateless APIs using tokens)
-                .requestCache(RequestCacheConfigurer::disable) // Disable request caching
+                // Apply CORS using the bean defined above
+                .cors(Customizer.withDefaults())
 
-                // Configure authorization rules for different request paths
+                // Disable CSRF protection - common for stateless APIs
+                .csrf(AbstractHttpConfigurer::disable)
+
+                // Disable default request caching
+                .requestCache(RequestCacheConfigurer::disable)
+
+                // Configure authorization rules
                 .authorizeHttpRequests(authz -> authz
-                        // --- Public Endpoints (No authentication required) ---
-                        .requestMatchers("/api/users/register", "/api/users/login").permitAll() // User registration and login
-                        .requestMatchers(HttpMethod.POST, "/api/public/contact").permitAll() // Public contact form submission
-                        .requestMatchers("/uploads/**").permitAll() // Allow access to uploaded static images/files
+                        // --- Public Endpoints ---
+                        .requestMatchers("/api/users/register", "/api/users/login").permitAll() // Registration & Login
+                        .requestMatchers(HttpMethod.POST, "/api/public/contact").permitAll() // Public Contact Form
+                        .requestMatchers("/uploads/**").permitAll() // Static images/files
 
                         // --- General Property Endpoints ---
-                        // VVV--- RULE FOR VIEWING PROPERTIES ---VVV
-                        // Allows ANY authenticated user (Customer, Owner, Admin) to view property lists and details
-                        .requestMatchers(HttpMethod.GET, "/api/properties", "/api/properties/**").authenticated()
-                        // VVV--- END RULE FOR VIEWING ---VVV
-                        // Allows ANY authenticated user to *attempt* to create a property (service layer handles owner assignment)
-                        .requestMatchers(HttpMethod.POST, "/api/properties").authenticated()
+                        .requestMatchers(HttpMethod.GET, "/api/properties", "/api/properties/**").authenticated() // View properties
+                        .requestMatchers(HttpMethod.POST, "/api/properties").authenticated() // Attempt to create property
 
-                        // --- Owner Property Endpoints (Modify/Delete/Upload Images) ---
-                        // Requires authentication. Specific ownership check is done using @PreAuthorize in OwnerPropertyController.
-                        .requestMatchers("/api/owner/properties/**").authenticated()
+                        // --- Owner Property Endpoints ---
+                        .requestMatchers("/api/owner/properties/**").authenticated() // Modify/Delete/Upload Images (requires ownership check via @PreAuthorize)
 
                         // --- Booking Endpoints ---
-                        // Requires authentication. Specific role/ownership checks are handled in BookingService or with @PreAuthorize in BookingController.
-                        .requestMatchers("/api/bookings/**").authenticated()
+                        .requestMatchers("/api/bookings/**").authenticated() // General booking actions (requires role/ownership check via @PreAuthorize)
+
+                        // --- Payment Endpoints ---
+                        .requestMatchers("/api/payments/**").authenticated() // Payment confirmation (requires role/ownership check via @PreAuthorize)
 
                         // --- Admin Endpoints ---
-                        // Requires the user to have the 'ADMIN' role (prefixed with ROLE_ internally by Spring Security)
-                        .requestMatchers("/api/admin/**").hasRole("ADMIN")
+                        .requestMatchers("/api/admin/**").hasRole("ADMIN") // Only ADMIN role
 
-                        // --- Other Authenticated Endpoints ---
-                        .requestMatchers("/api/users/test-auth").authenticated() // Example test endpoint
+                        // --- Other Authenticated ---
+                        .requestMatchers("/api/users/test-auth").authenticated() // Test endpoint
 
                         // --- Default Rule ---
-                        // Any other request not explicitly matched above requires authentication
-                        .anyRequest().authenticated()
+                        .anyRequest().authenticated() // All other unspecified requests require authentication
                 )
 
-                // Configure session management to be stateless (no HTTP sessions created)
+                // Set session management to STATELESS (no server-side session)
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
 
-                // Register the custom AuthenticationProvider (uses UserDetailsService + PasswordEncoder)
+                // Configure the AuthenticationProvider bean
                 .authenticationProvider(authenticationProvider())
 
-                // Add the custom JWT Filter to process the Authorization header before the standard authentication filters
-                .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
+                // Add the custom JWT filter before the standard username/password filter
+                .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class)
 
-        // Build and return the configured HttpSecurity object
+        // Optional: Configure Headers, e.g., for H2 console if used during dev
+        // .headers(headers -> headers.frameOptions(HeadersConfigurer.FrameOptionsConfig::sameOrigin)) // Example for H2 console
+        ;
+
+        // Build and return the configured security filter chain
         return http.build();
     }
 }

@@ -1,4 +1,5 @@
 com/example/demo/service/BookingService$1.class
+com/example/demo/controller/PaymentController.class
 com/example/demo/model/Property.class
 com/example/demo/config/filter/JwtAuthenticationFilter.class
 com/example/demo/dto/RegisterRequest.class

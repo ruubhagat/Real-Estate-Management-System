@@ -1,5 +1,6 @@
 package com.example.demo.controller;
 
+import com.example.demo.dto.PropertyDTO; // Import DTO
 import com.example.demo.model.Property;
 import com.example.demo.service.FileStorageService;
 import com.example.demo.service.PropertyService;
@@ -8,7 +9,8 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.prepost.PreAuthorize; // Import PreAuthorize
+import org.springframework.security.access.AccessDeniedException; // Import for catch block
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -31,17 +33,31 @@ public class OwnerPropertyController {
     @PutMapping("/{id}")
     @PreAuthorize("@propertyService.checkOwnership(#id)") // Check ownership before execution
     public ResponseEntity<?> updateMyProperty(@PathVariable Long id, @RequestBody Property propertyData) {
+        // Use Property entity as request body for simplicity, or create a dedicated UpdateDTO
         logger.info("Owner request received to update property ID: {}", id);
+        // --- VVV ADD LOGGING VVV ---
+        // Log received data (including amenities) before passing to service
+        logger.info("Received update payload in controller: Address={}, City={}, Amenities={}",
+                propertyData.getAddress(), propertyData.getCity(), propertyData.getAmenities());
+        // --- ^^^ END LOGGING ^^^ ---
         try {
-            // Service method already handles not found internally
+            // Service method attempts the update
             return propertyService.updateProperty(id, propertyData)
-                    .map(ResponseEntity::ok) // Return updated property entity/DTO
-                    .orElseGet(() -> ResponseEntity.notFound().build());
-        } catch (IllegalArgumentException e) { // Catch potential not found from service layer if logic changes
-            logger.warn("Owner Update failed: Property not found with ID: {} (Possible race condition or direct call issue)", id);
-            return ResponseEntity.notFound().build();
+                    // --- VVV Convert to DTO before sending response VVV ---
+                    .map(updatedEntity -> ResponseEntity.ok(convertToDto(updatedEntity))) // Use helper/factory
+                    // --- ^^^ End Conversion ^^^ ---
+                    .orElseGet(() -> {
+                        logger.warn("Owner Update failed: Property with ID {} not found by service.", id);
+                        return ResponseEntity.notFound().build(); // Return 404 if service returns empty Optional
+                    });
+        } catch (AccessDeniedException e) { // Catch potential security exceptions if @PreAuthorize fails unexpectedly
+            logger.warn("Owner Update Forbidden for property ID {}: {}", id, e.getMessage());
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", e.getMessage()));
+        } catch (IllegalArgumentException e) { // Catch specific exceptions like property not found within service calls
+            logger.warn("Owner Update failed for property ID {}: {}", id, e.getMessage());
+            return ResponseEntity.notFound().build(); // Treat as Not Found
         } catch (Exception e) { // Catch unexpected errors
-            logger.error("Owner Error: Error updating property {}: {}", id, e.getMessage(), e);
+            logger.error("Owner Error: Unexpected error updating property {}: {}", id, e.getMessage(), e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("error", "Error updating property."));
         }
     }
@@ -52,11 +68,13 @@ public class OwnerPropertyController {
     public ResponseEntity<?> deleteMyProperty(@PathVariable Long id) {
         logger.info("Owner request received to delete property ID: {}", id);
         try {
-            // Service method handles not found internally
             boolean deleted = propertyService.deleteProperty(id);
             return deleted ? ResponseEntity.noContent().build() : ResponseEntity.notFound().build();
-        } catch (IllegalArgumentException e) { // Catch potential not found from service layer if logic changes
-            logger.warn("Owner Delete failed: Property not found with ID: {} (Possible race condition or direct call issue)", id);
+        } catch (AccessDeniedException e) {
+            logger.warn("Owner Delete Forbidden for property ID {}: {}", id, e.getMessage());
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", e.getMessage()));
+        } catch (IllegalArgumentException e) { // Catch property not found from service
+            logger.warn("Owner Delete failed: Property not found with ID: {}", id);
             return ResponseEntity.notFound().build();
         } catch (Exception e) { // Catch unexpected errors
             logger.error("Owner Error: Error deleting property {}: {}", id, e.getMessage(), e);
@@ -70,8 +88,6 @@ public class OwnerPropertyController {
     public ResponseEntity<?> uploadMyPropertyImages(@PathVariable Long id, @RequestParam("files") MultipartFile[] files) {
         logger.info("Owner request received to upload {} images for property ID: {}", files.length, id);
 
-        // 1. Find the property first to get existing URLs and ensure it exists
-        // Although @PreAuthorize checked ownership (implying existence), checking again is safer.
         Optional<Property> propertyOpt = propertyService.findPropertyById(id);
         if (propertyOpt.isEmpty()) {
             logger.warn("Owner image upload failed: Property not found with ID: {} (despite @PreAuthorize passing?)", id);
@@ -79,7 +95,6 @@ public class OwnerPropertyController {
         }
         Property currentProperty = propertyOpt.get();
 
-        // 2. Process and store each valid file
         List<String> uploadedFileNames = new ArrayList<>();
         try {
             for (MultipartFile file : files) {
@@ -93,38 +108,69 @@ public class OwnerPropertyController {
                     uploadedFileNames.add(fileName);
                 }
             }
-        } catch (RuntimeException e) { // Catch storage errors
+        } catch (RuntimeException e) {
             logger.error("Owner Error: Error storing file for property {}: {}", id, e.getMessage(), e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("error", "Failed to store one or more files. " + e.getMessage()));
         }
 
-        // 3. Check if any valid files were actually uploaded
         if (uploadedFileNames.isEmpty()) {
             return ResponseEntity.badRequest().body(Map.of("error", "No valid image files were uploaded or processed."));
         }
 
-        // 4. Prepare the new imageUrls string
         String existingUrlString = currentProperty.getImageUrls();
         String namesToStore = String.join(",", uploadedFileNames);
         String newUrlString = (existingUrlString != null && !existingUrlString.isBlank())
                 ? existingUrlString + "," + namesToStore
                 : namesToStore;
 
-        // 5. Call the service method to update only the image URLs
         try {
-            propertyService.updateImageUrls(id, newUrlString); // Use the dedicated service method
+            propertyService.updateImageUrls(id, newUrlString);
             logger.info("Owner successfully updated image filenames for property ID: {}", id);
             return ResponseEntity.ok(Map.of(
                     "message", "Images uploaded and property updated successfully.",
                     "imageFilenames", uploadedFileNames
             ));
+        } catch (AccessDeniedException e) { // Should be caught by @PreAuthorize, but belt-and-suspenders
+            logger.warn("Owner update image URLs Forbidden for property ID {}: {}", id, e.getMessage());
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", e.getMessage()));
         } catch (IllegalArgumentException e) { // Catch property not found from service
-            logger.warn("Owner update image URLs failed: Property not found with ID: {} (Possible race condition)", id);
+            logger.warn("Owner update image URLs failed: Property not found with ID: {}", id);
             return ResponseEntity.notFound().build();
-        } catch (Exception e) { // Catch other potential DB save errors
+        } catch (Exception e) {
             logger.error("Owner Error: Error saving property after image upload for ID {}: {}", id, e.getMessage(), e);
-            // Consider deleting the files just uploaded from the filesystem if DB save fails (rollback)
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("error", "Failed to update property with image paths."));
         }
+    }
+
+    // --- Helper Method: Convert Property Entity to PropertyDTO ---
+    // Duplicated here for now, consider moving to a shared utility or using MapStruct
+    private PropertyDTO convertToDto(Property property) {
+        if (property == null) {
+            return null;
+        }
+        PropertyDTO dto = new PropertyDTO();
+        dto.setId(property.getId());
+        dto.setAddress(property.getAddress());
+        dto.setCity(property.getCity());
+        dto.setState(property.getState());
+        dto.setPostalCode(property.getPostalCode());
+        dto.setPrice(property.getPrice());
+        dto.setBedrooms(property.getBedrooms());
+        dto.setBathrooms(property.getBathrooms());
+        dto.setAreaSqft(property.getAreaSqft());
+        dto.setDescription(property.getDescription());
+        dto.setType(property.getType());
+        dto.setStatus(property.getStatus());
+        dto.setImageUrls(property.getImageUrls());
+        dto.setCreatedAt(property.getCreatedAt());
+        dto.setUpdatedAt(property.getUpdatedAt());
+        dto.setAmenities(property.getAmenities()); // Include amenities
+
+        if (property.getOwner() != null) {
+            dto.setOwnerId(property.getOwner().getId());
+            dto.setOwnerName(property.getOwner().getName());
+            dto.setOwnerEmail(property.getOwner().getEmail());
+        }
+        return dto;
     }
 }

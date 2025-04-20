@@ -1,8 +1,7 @@
 import React, { useState } from 'react';
 import axios from 'axios';
-// Optional: Import useNavigate for redirection after login
-import { useNavigate } from 'react-router-dom';
-import './Form.css';
+import { useNavigate, Link, useLocation } from 'react-router-dom'; // Added Link, useLocation
+import './Form.css'; // Import shared form styles
 
 function Login() {
   const [form, setForm] = useState({
@@ -10,7 +9,9 @@ function Login() {
     password: ''
   });
   const [error, setError] = useState(''); // State to hold login errors
+  const [loading, setLoading] = useState(false); // State for loading indicator
   const navigate = useNavigate(); // Hook for navigation
+  const location = useLocation(); // Hook to get previous location (if redirected)
 
   const handleChange = (e) => {
     setForm({ ...form, [e.target.name]: e.target.value });
@@ -20,19 +21,26 @@ function Login() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError(''); // Clear previous errors
+    setLoading(true); // Start loading
+
+    if (!form.email || !form.password) {
+        setError("Please enter both email and password.");
+        setLoading(false);
+        return;
+    }
 
     try {
-      // Use the correct backend URL (port 8081)
+      // Use the correct backend URL
       const response = await axios.post("http://localhost:8081/api/users/login", {
-        email: form.email,
-        password: form.password,
+        email: form.email.trim(), // Trim whitespace
+        password: form.password, // Don't trim password
       });
 
-      console.log("Login Response:", response.data); // Log the response data
+      console.log("Login Response:", response.data);
 
       // Check if login was successful and token exists
       if (response.data && response.data.token) {
-        alert("Login successful!");
+        // alert("Login successful!"); // Replaced with navigation
 
         // <<<--- STORE TOKEN and User Info --->>>
         localStorage.setItem('authToken', response.data.token);
@@ -40,61 +48,83 @@ function Login() {
         localStorage.setItem('userEmail', response.data.userEmail);
         localStorage.setItem('userRole', response.data.userRole);
 
-        // Optional: Redirect user to a dashboard or home page
-        // navigate('/dashboard'); // Example redirect
+        // Redirect user: Check if redirected from a protected route
+        const from = location.state?.from?.pathname || "/"; // Default to home page
+        console.log("Login successful, navigating to:", from);
+        // Use replace: true so login page isn't in history
+        navigate(from, { replace: true });
 
-        // You might want to reload the window or update app state
-        // to reflect the logged-in status immediately in the UI
-        window.location.reload(); // Simple way to refresh UI state, but consider Context API or Redux later
+        // Force a reload to update Header state etc. (Simpler than context for now)
+         // Delay slightly to ensure navigation completes before reload potentially interrupts
+         setTimeout(() => {
+            window.location.reload();
+         }, 100);
+
 
       } else {
-        // Handle cases where the backend might return 200 OK but no token (shouldn't happen with current backend code)
-        setError("Login failed: No token received.");
-        alert("Login failed: No token received.");
+        // Handle cases where the backend might return 200 OK but no token
+        setError("Login failed: Invalid response from server.");
       }
     } catch (err) {
       console.error("Login failed:", err);
       // Extract error message from backend response if available
       const errorMessage = err.response?.data?.error || "Login failed. Please check your credentials.";
       setError(errorMessage);
-      alert(errorMessage);
+    } finally {
+        setLoading(false); // Stop loading
     }
   };
 
   return (
-    <div style={{ maxWidth: "400px", margin: "0 auto", padding: "1rem" }}>
+    // Apply form-container class
+    <div className="form-container">
       <h2>Login</h2>
+
       <form onSubmit={handleSubmit}>
-        <div style={{ marginBottom: '1rem' }}>
-          <label htmlFor="email">Email:</label><br />
+        {/* Display error messages using Form.css classes */}
+        {error && <p className="form-message form-error">{error}</p>}
+
+        {/* Apply form-input-group structure */}
+        <div className="form-input-group">
+          <label htmlFor="login-email">Email:</label>
           <input
-            id="email"
+            id="login-email"
             name="email"
             type="email"
-            placeholder="Email"
+            placeholder="your.email@example.com" // Added placeholder
             value={form.email}
             onChange={handleChange}
             required
-            style={{ width: '100%', padding: '8px', boxSizing: 'border-box' }}
+            disabled={loading} // Disable when loading
           />
         </div>
-        <div style={{ marginBottom: '1rem' }}>
-          <label htmlFor="password">Password:</label><br />
+
+        <div className="form-input-group">
+          <label htmlFor="login-password">Password:</label>
           <input
-            id="password"
+            id="login-password"
             name="password"
             type="password"
             placeholder="Password"
             value={form.password}
             onChange={handleChange}
             required
-            style={{ width: '100%', padding: '8px', boxSizing: 'border-box' }}
+            disabled={loading} // Disable when loading
           />
         </div>
-        {error && <p style={{ color: 'red' }}>{error}</p>} {/* Display error messages */}
-        <button type="submit" style={{ padding: '10px 15px' }}>Login</button>
+
+        {/* Apply form-button class */}
+        <button type="submit" className="form-button" disabled={loading}>
+          {loading ? 'Logging In...' : 'Login'}
+        </button>
       </form>
-    </div>
+
+       {/* Optional: Link to Registration page */}
+       <div style={{ textAlign: 'center', marginTop: '20px', fontSize: '0.9em' }}>
+            Don't have an account? <Link to="/register" style={{ color: 'var(--primary-color)', fontWeight: '500' }}>Register here</Link>
+       </div>
+
+    </div> // End form-container
   );
 }
 
