@@ -18,22 +18,42 @@ function Home() {
   // Fetch featured properties
   useEffect(() => {
     const fetchFeatured = async () => {
-       setLoading(true); setError('');
+       console.log("[Home] useEffect for featured properties running.");
+       setLoading(true);
+       setError('');
+
+       // --- VVV TOKEN CHECK REMOVED VVV ---
+       // The GET /api/properties endpoint is now public
+       // --- ^^^ END REMOVAL ^^^ ---
+
        try {
-         // Fetch AVAILABLE properties using the correct endpoint
+         console.log("[Home] Making API Call: GET /properties?status=AVAILABLE");
+         // Fetch AVAILABLE properties - Endpoint is public
          const response = await apiClient.get('/properties', { params: { status: 'AVAILABLE' } });
-         console.log("[Home] Featured properties API Response:", response.data);
-         // Ensure response.data is an array
+         console.log("[Home] Featured properties API Response Status:", response.status);
+         console.log("[Home] Featured properties API Response Data:", response.data);
          const properties = Array.isArray(response.data) ? response.data : [];
-         // Slice the first 3 properties or fewer if less than 3 available
          setFeaturedProperties(properties.slice(0, 3));
+         console.log("[Home] Featured properties state set.");
        } catch (err) {
          console.error("[Home] Failed to fetch featured properties:", err);
-         setError('Could not load featured properties.');
-       } finally { setLoading(false); }
+         if (err.response) { console.error("[Home] Error Status:", err.response.status); console.error("[Home] Error Data:", err.response.data); }
+         else if (err.request) { console.error("[Home] Error Request:", err.request); }
+         else { console.error("[Home] Error Msg:", err.message); }
+
+         let fetchErrorMsg = 'Could not load featured properties.';
+         // Authentication errors (401/403) are no longer expected for this specific call
+         if (err.response?.data?.error) { fetchErrorMsg = err.response.data.error; }
+         else { fetchErrorMsg = err.message || fetchErrorMsg; }
+         setError(fetchErrorMsg);
+         setFeaturedProperties([]);
+       } finally {
+           console.log("[Home] Fetch attempt finished. Setting loading to false.");
+           setLoading(false);
+       }
     };
     fetchFeatured();
-  }, []);
+  }, []); // Empty dependency array means run once on mount
 
   // Contact Form Handlers
   const handleContactChange = (e) => {
@@ -50,15 +70,11 @@ function Home() {
        }
        setContactSubmitting(true);
        try {
-            console.log("Submitting contact form data:", contactForm);
-            // Use public endpoint
-            const response = await apiClient.post('/public/contact', contactForm);
-            console.log("Contact form response:", response.data);
+            const response = await apiClient.post('/public/contact', contactForm); // Public endpoint
             setContactSuccess(response.data.message || 'Message sent successfully!');
             setContactForm({ name: '', email: '', message: '' }); // Clear form
        } catch (err) {
-            console.error("Failed to send contact message:", err);
-            const errMsg = err.response?.data?.error || err.message || 'Failed to send message. Please try again.';
+            const errMsg = err.response?.data?.error || err.message || 'Failed to send message.';
             setContactError(errMsg);
        } finally {
            setContactSubmitting(false);
@@ -71,7 +87,7 @@ function Home() {
       {/* --- Hero Section --- */}
       <div className="hero-section">
          <div className="hero-content fade-in">
-          <h1>Find Your Perfect Estate</h1> {/* Updated heading */}
+          <h1>Find Your Perfect Estate</h1>
           <p>Discover exceptional properties and opportunities.</p>
           <button className="hero-search-button" onClick={() => navigate('/properties')}>
             Explore Properties
@@ -82,74 +98,51 @@ function Home() {
       {/* --- Featured Properties Section --- */}
       <div className="featured-properties">
          <h2>Featured Listings</h2>
-        {loading && <p className="loading">Loading featured properties...</p>}
-        {error && <p className="error" style={{color:'red', padding:'10px', border:'1px solid red'}}>Error: {error}</p>}
+        {loading && <p className="loading" style={{textAlign:'center', padding:'20px'}}>Loading featured properties...</p>}
+        {error && !loading && <p className="error" style={{color:'var(--error-text)', backgroundColor:'var(--error-bg)', border:'1px solid var(--error-border)', padding:'15px', borderRadius:'4px', textAlign:'center'}}>Error: {error}</p>}
+
         {!loading && !error && (
-          <div className="property-grid">
+          <>
             {featuredProperties.length > 0 ? (
-              featuredProperties.map(property => (
-                <PropertyCard key={property.id} property={property} />
-              ))
-            ) : (
-              <p>No featured properties available at the moment.</p>
-            )}
-          </div>
-        )}
-         {/* Link to view all properties */}
-         {!loading && featuredProperties.length > 0 && (
-              <div style={{marginTop: '40px'}}>
-                  <Link to="/properties" className="hero-search-button" style={{padding: '12px 30px', fontSize:'1rem'}}>
-                      View All Properties
-                  </Link>
+              <div className="property-grid">
+                {featuredProperties.map(property => (
+                  <PropertyCard key={property.id} property={property} />
+                ))}
               </div>
-         )}
+            ) : (
+              <p style={{textAlign:'center', padding:'20px'}}>No featured properties available at the moment.</p>
+            )}
+            {/* Link to view all properties */}
+            {featuredProperties.length > 0 && (
+                 <div style={{marginTop: '40px', textAlign: 'center'}}>
+                     <Link to="/properties" className="hero-search-button" style={{padding: '12px 30px', fontSize:'1rem'}}>
+                         View All Properties
+                     </Link>
+                 </div>
+            )}
+          </>
+        )}
       </div>
 
       {/* --- Contact Us Section --- */}
       <section className="contact-section">
         <h2>Get In Touch</h2>
         <p className="section-subtitle">Have questions or need assistance? Fill out the form below or reach out to us directly.</p>
-
-        {/* Contact Form */}
         <form onSubmit={handleContactSubmit} className="contact-form">
              {contactError && <p className="form-message form-error">{contactError}</p>}
              {contactSuccess && <p className="form-message form-success">{contactSuccess}</p>}
-            <div className="form-input-group">
-                 <label htmlFor="contactName">Name:</label>
-                 <input type="text" id="contactName" name="name" value={contactForm.name} onChange={handleContactChange} required />
-            </div>
-             <div className="form-input-group">
-                <label htmlFor="contactEmail">Email:</label>
-                <input type="email" id="contactEmail" name="email" value={contactForm.email} onChange={handleContactChange} required />
-            </div>
-            <div className="form-input-group">
-                <label htmlFor="contactMessage">Message:</label>
-                <textarea id="contactMessage" name="message" rows="5" value={contactForm.message} onChange={handleContactChange} required></textarea>
-            </div>
-             <button type="submit" className="form-button" disabled={contactSubmitting}>
-                 {contactSubmitting ? 'Sending...' : 'Send Message'}
-            </button>
+             {/* ... form inputs ... */}
+             <div className="form-input-group"><label htmlFor="contactName">Name:</label><input type="text" id="contactName" name="name" value={contactForm.name} onChange={handleContactChange} required /></div>
+             <div className="form-input-group"><label htmlFor="contactEmail">Email:</label><input type="email" id="contactEmail" name="email" value={contactForm.email} onChange={handleContactChange} required /></div>
+             <div className="form-input-group"><label htmlFor="contactMessage">Message:</label><textarea id="contactMessage" name="message" rows="5" value={contactForm.message} onChange={handleContactChange} required></textarea></div>
+             <button type="submit" className="form-button" disabled={contactSubmitting}>{contactSubmitting ? 'Sending...' : 'Send Message'}</button>
         </form>
-
-        {/* --- Contact Info Blocks --- */}
-        {/* VVV --- MODIFIED CONTACT INFO --- VVV */}
         <div className="contact-info">
-            <div className="contact-info-item">
-                <h4>Address</h4>
-                <p>Estates, Banashankari<br/>Bengaluru<br/>Karnataka, 560050</p>
-            </div>
-            <div className="contact-info-item">
-                <h4>Phone</h4>
-                <p><a href="tel:+91123456789">+91-1234567890</a></p> {/* Replace with actual phone */}
-                <p>Mon - Fri, 11 am - 5 pm IST</p> {/* Updated Timings */}
-            </div>
-            <div className="contact-info-item">
-                <h4>Email</h4>
-                <p><a href="mailto:inquiries@estates.com">inquiries@estates.com</a></p> {/* Updated Email */}
-                <p>We typically reply within 24 hours.</p>
-            </div>
+            {/* ... contact details ... */}
+             <div className="contact-info-item"><h4>Address</h4><p>Estates, Banashankari<br/>Bengaluru<br/>Karnataka, 560050</p></div>
+             <div className="contact-info-item"><h4>Phone</h4><p><a href="tel:+91123456789">+91-1234567890</a></p><p>Mon - Fri, 11 am - 5 pm IST</p></div>
+             <div className="contact-info-item"><h4>Email</h4><p><a href="mailto:inquiries@estates.com">inquiries@estates.com</a></p><p>Typically replies within 24 hours.</p></div>
         </div>
-         {/* ^^^ --- END MODIFIED CONTACT INFO --- ^^^ */}
       </section>
     </div>
   );
